@@ -38,16 +38,24 @@ jobs:
             // ========================================================
             // 2. HANDLE ISSUE COMMANDS (Features 2, 3, 4)
             // ========================================================
-            if (context.eventName === 'issue_comment' && !context.payload.issue.pull_request) {
+           if (context.eventName === 'issue_comment' && !context.payload.issue.pull_request) {
               const commentBody = context.payload.comment.body.trim();
               const commenter = context.payload.comment.user.login;
               const issueNumber = context.issue.number;
-              const issueState = context.payload.issue.state;
-              const assignees = context.payload.issue.assignees || [];
+
+              // Fetch the absolute freshest issue state to prevent race conditions
+              const { data: freshIssue } = await github.rest.issues.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber
+              });
+
+              const issueState = freshIssue.state;
+              const assignees = freshIssue.assignees || [];
               const isAssigned = assignees.length > 0;
-              const issueAuthor = context.payload.issue.user.login;
+              const issueAuthor = freshIssue.user.login;
               const isIssueAuthor = commenter === issueAuthor;
-              const authorAssociation = context.payload.issue.author_association;
+              const authorAssociation = freshIssue.author_association;
 
               const isMaintainerIssue = [
                 "OWNER",
@@ -161,7 +169,6 @@ Repository maintainers may still assign contributors manually if required.`,
                 commentBody !== CLAIM_COMMAND &&
                 commentBody !== UNCLAIM_COMMAND &&
                 invalidClaimMessages.includes(commentBody.toLowerCase())
-              ){
               ) {
                 await github.rest.issues.createComment({
                   owner: context.repo.owner,

@@ -38,24 +38,34 @@ jobs:
             // ========================================================
             // 2. HANDLE ISSUE COMMANDS (Features 2, 3, 4)
             // ========================================================
-           if (context.eventName === 'issue_comment' && !context.payload.issue.pull_request) {
+            if (context.eventName === 'issue_comment' && !context.payload.issue.pull_request) {
               const commentBody = context.payload.comment.body.trim();
               const commenter = context.payload.comment.user.login;
               const issueNumber = context.issue.number;
 
-              // Fetch the absolute freshest issue state to prevent race conditions
-              const { data: freshIssue } = await github.rest.issues.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: issueNumber
-              });
+              // Fallback variables using payload data in case the real-time API call fails
+              let issueState = context.payload.issue.state;
+              let assignees = context.payload.issue.assignees || [];
+              let issueAuthor = context.payload.issue.user.login;
+              let authorAssociation = context.payload.issue.author_association;
 
-              const issueState = freshIssue.state;
-              const assignees = freshIssue.assignees || [];
+              // Fetch freshest issue state via API to eliminate race conditions
+              try {
+                const { data: freshIssue } = await github.rest.issues.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber
+                });
+                issueState = freshIssue.state;
+                assignees = freshIssue.assignees || [];
+                issueAuthor = freshIssue.user.login;
+                authorAssociation = freshIssue.author_association;
+              } catch (error) {
+                console.warn(`⚠️ Warning: Failed to fetch fresh issue state from API for #${issueNumber}. Falling back to payload data. Error: ${error.message}`);
+              }
+
               const isAssigned = assignees.length > 0;
-              const issueAuthor = freshIssue.user.login;
               const isIssueAuthor = commenter === issueAuthor;
-              const authorAssociation = freshIssue.author_association;
 
               const isMaintainerIssue = [
                 "OWNER",
@@ -66,30 +76,6 @@ jobs:
               const UNCLAIM_COMMAND = "/unclaim";
 
               const BOT_MESSAGES = {
-                invalidClaim: (user) =>
-                  `👋 Thanks for your interest, @${user}!\n\n` +
-                  `To claim this issue, please comment:\n\n` +
-                  `\`${CLAIM_COMMAND}\`\n\n` +
-                  `Only the first valid \`${CLAIM_COMMAND}\` comment is eligible for automatic assignment.`,
-
-                assigned: (user) =>
-                  `🎉 Issue Assigned\n\n` +
-                  `Welcome @${user}!\n\n` +
-                  `This issue has been assigned to you following our first-come, first-served policy.\n\n` +
-                  `Please submit a Pull Request within 24 hours.\n\n` +
-                  `If you need more time, please update the issue before the deadline.\n\n` +
-                  `Happy coding! 🚀`,
-
-                alreadyAssigned: (user) =>
-                  `⚠️ This issue is currently assigned to @${user}.\n\n` +
-                  `If the issue becomes available again, feel free to claim it.`,
-
-                claimRejected: (author) =>
-                  `❌ This issue was opened by another contributor.\n\n` +
-                  `Only the issue author (@${author}) may claim this issue automatically.\n\n` +
-                  `Repository maintainers may still assign contributors manually if required.`,
-                alreadyClaimed: (user) => `⚠️ @${user}, you are already assigned to this issue!`,
-                closedIssue: (user) => `❌ Request denied. You cannot claim a closed issue, @${user}.`
                 invalidClaim: (user) => `👋 Thanks for your interest, @${user}!
 
 To claim this issue, please comment:

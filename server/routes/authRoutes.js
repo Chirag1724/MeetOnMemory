@@ -12,19 +12,24 @@ import {
 } from "../controllers/authControllers.js";
 
 import userAuth from "../middleware/userAuth.js";
+import {
+  loginLimiter,
+  registerLimiter,
+  otpLimiter,
+} from "../middleware/rateLimiter.js";
 
 const router = express.Router();
 
-// ✅ Auth routes
-router.post("/register", register);
-router.post("/login", login);
+// ✅ Auth routes with rate limiting
+router.post("/register", registerLimiter, register);
+router.post("/login", loginLimiter, login);
 router.post("/logout", logout);
 
-// ✅ Verification & password reset
-router.post("/send-verify-otp", userAuth, sendVerifyOtp);
-router.post("/verify-email", userAuth, verifyEmail);
-router.post("/send-reset-otp", sendResetOtp);
-router.post("/reset-password", resetPassword);
+// ✅ Verification & password reset with rate limiting
+router.post("/send-verify-otp", otpLimiter, userAuth, sendVerifyOtp);
+router.post("/verify-email", otpLimiter, userAuth, verifyEmail);
+router.post("/send-reset-otp", otpLimiter, sendResetOtp);
+router.post("/reset-password", otpLimiter, resetPassword);
 
 // ✅ Dashboard & auth status
 router.get("/user-data", userAuth, getUserData);

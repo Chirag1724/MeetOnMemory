@@ -35,3 +35,46 @@ export const uploadLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+// ================================
+// AUTHENTICATION RATE LIMITERS
+// ================================
+
+// Rate limiter for login endpoint (protects against brute-force attacks)
+export const loginLimiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_LOGIN_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes default
+  max: parseInt(process.env.RATE_LIMIT_LOGIN_MAX) || 5, // 5 attempts per window default
+  message: {
+    success: false,
+    message: "Too many login attempts, please try again later.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true, // Don't count successful requests
+});
+
+// Rate limiter for registration endpoint (protects against automated account creation)
+export const registerLimiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_REGISTER_WINDOW_MS) || 60 * 60 * 1000, // 1 hour default
+  max: parseInt(process.env.RATE_LIMIT_REGISTER_MAX) || 3, // 3 registrations per hour default
+  message: {
+    success: false,
+    message: "Too many registration attempts, please try again later.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+});
+
+// Rate limiter for OTP endpoints (protects against OTP abuse and spam)
+export const otpLimiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_OTP_WINDOW_MS) || 60 * 60 * 1000, // 1 hour default
+  max: parseInt(process.env.RATE_LIMIT_OTP_MAX) || 5, // 5 OTP requests per hour default
+  message: {
+    success: false,
+    message: "Too many OTP requests, please try again later.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+});

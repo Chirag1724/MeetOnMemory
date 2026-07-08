@@ -30,34 +30,30 @@ export const getNotifications = async (req, res) => {
     }
 
     const { category, status } = req.query;
-    const filter = { user: req.user.id };
 
-    const allowedCategories = [
-      "meetings",
-      "ai_processing",
-      "organizations",
-      "policies",
-      "reports",
-      "system",
-    ];
-    if (
-      category &&
-      category !== "all" &&
-      allowedCategories.includes(category)
-    ) {
-      filter.category = category;
+    let query = notificationModel.find({ user: req.user.id });
+
+    if (category === "meetings") {
+      query = query.where("category").equals("meetings");
+    } else if (category === "ai_processing") {
+      query = query.where("category").equals("ai_processing");
+    } else if (category === "organizations") {
+      query = query.where("category").equals("organizations");
+    } else if (category === "policies") {
+      query = query.where("category").equals("policies");
+    } else if (category === "reports") {
+      query = query.where("category").equals("reports");
+    } else if (category === "system") {
+      query = query.where("category").equals("system");
     }
 
     if (status === "unread") {
-      filter.isRead = false;
+      query = query.where("isRead").equals(false);
     } else if (status === "read") {
-      filter.isRead = true;
+      query = query.where("isRead").equals(true);
     }
 
-    const notifications = await notificationModel
-      .find(filter)
-      .sort({ createdAt: -1 })
-      .limit(100);
+    const notifications = await query.sort({ createdAt: -1 }).limit(100);
 
     const unreadCount = await notificationModel.countDocuments({
       user: req.user.id,

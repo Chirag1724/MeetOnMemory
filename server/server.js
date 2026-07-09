@@ -20,6 +20,7 @@ import notificationRoutes from "./routes/notificationRoutes.js";
 
 import { initVectorStore } from "./utils/embeddingUtils.js";
 import meetingSocket from "./socket/meetingSocket.js";
+import { globalLimiter } from "./middleware/rateLimiter.js";
 
 dotenv.config();
 
@@ -95,6 +96,9 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
   }),
 );
+
+// Apply global rate limit after CORS
+app.use(globalLimiter);
 
 // ================================
 // STATIC FILES

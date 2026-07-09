@@ -118,17 +118,27 @@ useEffect(() => {
       );
 
       if (res.data?.success) {
+        const statusMap = {
+          open: "to-do",
+          "in-progress": "in-progress",
+          resolved: "completed",
+          superseded: "completed",
+        };
         const items = res.data.actionItems.map((item) => ({
           id: item._id,
           title: item.text,
-          owner: item.owner,
+          owner: item.owner || "Unassigned",
           dueDate: item.dueDate,
-          status: item.status,
+          status: statusMap[item.status] || "to-do",
+
           meetingId: item.sourceMeetingId?._id,
           meetingTitle: item.sourceMeetingId?.title,
           meetingDate: item.sourceMeetingId?.date,
-        }));
 
+          priority: item.priority || "medium",
+          organization: item.sourceMeetingId?.organization?.name || "Personal",
+          description: item.description || item.text,
+      }));
         setTasks(items);
       } else {
         setError(res.data?.message || "Failed to load tasks");

@@ -31,19 +31,22 @@ import Notifications from "./pages/Notifications.jsx";
 import Tasks from "./pages/Tasks.jsx";
 import KnowledgeTimeline from "./pages/KnowledgeTimeline.jsx";
 import Settings from "./pages/Settings.jsx";
+import Navbar from "./components/Navbar";
+import ScrollNavigator from "./components/ScrollNavigator";
 
 // --- Components ---
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import Footer from "./components/Footer.jsx";
-
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
 const App = () => {
   const location = useLocation();
 
   const hideFooterRoutes = ["/login"];
-
   const shouldShowFooter = !hideFooterRoutes.includes(location.pathname);
+  
+  // Only activate navigation controller panel when exactly on the landing page fold
+  const shouldShowScrollNavigator = location.pathname === "/";
 
   const [isHovered, setIsHovered] = useState(false);
   const [isMobile, setIsMobile] = useState(true);
@@ -152,7 +155,6 @@ const App = () => {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/create-organization"
             element={
@@ -161,7 +163,6 @@ const App = () => {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/dashboard"
             element={
@@ -180,7 +181,6 @@ const App = () => {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/upload-meeting"
             element={
@@ -189,7 +189,6 @@ const App = () => {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/policies"
             element={
@@ -198,7 +197,6 @@ const App = () => {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/summaries"
             element={
@@ -207,7 +205,6 @@ const App = () => {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/reports"
             element={
@@ -216,7 +213,6 @@ const App = () => {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/ai-search"
             element={
@@ -225,9 +221,7 @@ const App = () => {
               </ProtectedRoute>
             }
           />
-
           <Route path="/meeting-room/:roomId" element={<MeetingRoom />} />
-
           <Route
             path="/meeting/:id"
             element={
@@ -236,7 +230,6 @@ const App = () => {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/team-members"
             element={
@@ -245,7 +238,6 @@ const App = () => {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/profile"
             element={
@@ -254,7 +246,6 @@ const App = () => {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/calendar"
             element={
@@ -263,7 +254,6 @@ const App = () => {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/notifications"
             element={
@@ -272,7 +262,6 @@ const App = () => {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/tasks"
             element={
@@ -281,7 +270,6 @@ const App = () => {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/settings"
             element={
@@ -294,15 +282,17 @@ const App = () => {
           {/* ✅ Fallback route — send unknown routes to Home */}
           <Route path="*" element={<Home />} />
         </Routes>
+
+        {/* Floating Section Controller overlay */}
+        {shouldShowScrollNavigator && <ScrollNavigator />}
+
         {/* Global Footer */}
         {shouldShowFooter && <Footer />}
 
         {!isMobile && (
           <>
             <div className={`custom-cursor ${isHovered ? "hovered" : ""}`} />
-            <div
-              className={`custom-cursor-ring ${isHovered ? "hovered" : ""}`}
-            />
+            <div className={`custom-cursor-ring ${isHovered ? "hovered" : ""}`} />
           </>
         )}
       </ErrorBoundary>

@@ -7,6 +7,17 @@ import "./utils/apiInterceptor.js";
 import { BrowserRouter } from "react-router-dom";
 import { AppContextProvider } from "./context/AppContext.jsx";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
+
+// Prevent FOUC by applying theme class before render
+const savedTheme = localStorage.getItem("theme");
+const systemPrefersDark = window.matchMedia(
+  "(prefers-color-scheme: dark)",
+).matches;
+const initialTheme = savedTheme || (systemPrefersDark ? "dark" : "light");
+if (initialTheme === "dark") {
+  document.documentElement.classList.add("dark");
+}
+
 createRoot(document.getElementById("root")).render(
   <BrowserRouter>
     <ThemeProvider>

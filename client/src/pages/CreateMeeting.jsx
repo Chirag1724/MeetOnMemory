@@ -220,17 +220,14 @@ const CreateMeeting = () => {
         });
     }
 
-    // Redirect with query parameters
-    setTimeout(() => {
-      const queryParams = new URLSearchParams({
-        recording: willRecord.toString(),
-        participants: JSON.stringify(liveParticipants),
-      }).toString();
+    // Open meeting room window during user gesture
+    const queryParams = new URLSearchParams({
+      recording: willRecord.toString(),
+    }).toString();
 
-      window.open(`/meeting-room/${roomId}?${queryParams}`, "_blank");
+    window.open(`/meeting-room/${roomId}?${queryParams}`, "_blank");
 
-      setLiveParticipants([]);
-    }, 500);
+    setLiveParticipants([]);
   };
   // ========== HANDLERS: SECTION 3 - SESSION CARDS ==========
   const handleSessionChange = (e) => {

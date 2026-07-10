@@ -147,17 +147,17 @@ const Hero = () => {
           >
             <div className="relative w-full max-w-sm sm:max-w-md animate-float">
               {/* Glow rings */}
-              <div className="absolute inset-0 rounded-2xl bg-linear-to-br from-blue-400/20 to-purple-400/20 blur-2xl scale-110" />
+              <div className="absolute inset-0 rounded-2xl bg-linear-to-br from-blue-400/20 to-purple-400/20 dark:from-blue-600/20 dark:to-purple-600/20 blur-2xl scale-110" />
 
               {/* Dashboard card */}
-              <div className="relative bg-white rounded-2xl shadow-2xl border border-gray-100 p-5 sm:p-6">
+              <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 p-5 sm:p-6">
                 {/* Mockup browser chrome */}
-                <div className="flex items-center gap-2 mb-5 pb-4 border-b border-gray-100">
+                <div className="flex items-center gap-2 mb-5 pb-4 border-b border-gray-100 dark:border-gray-700">
                   <div className="w-3 h-3 bg-red-400 rounded-full" />
                   <div className="w-3 h-3 bg-yellow-400 rounded-full" />
                   <div className="w-3 h-3 bg-green-400 rounded-full" />
-                  <div className="flex-1 mx-3 h-6 bg-gray-100 rounded-md flex items-center px-3">
-                    <span className="text-xs text-gray-400 truncate">
+                  <div className="flex-1 mx-3 h-6 bg-gray-100 dark:bg-gray-700 rounded-md flex items-center px-3">
+                    <span className="text-xs text-gray-400 dark:text-gray-300 truncate">
                       meetonmemory.app/dashboard
                     </span>
                   </div>

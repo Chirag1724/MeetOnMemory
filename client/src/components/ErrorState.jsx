@@ -10,11 +10,15 @@ const ErrorState = ({
 }) => {
   return (
     <div
-      className={`flex flex-col items-center justify-center p-8 text-center bg-red-50 rounded-lg border border-red-100 ${className}`}
+      className={`flex flex-col items-center justify-center p-8 text-center bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-800 ${className}`}
     >
-      <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
-      <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
-      <p className="text-gray-600 mb-6 max-w-md">{message}</p>
+      <AlertCircle className="w-12 h-12 text-red-500 dark:text-red-400 mb-4" />
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+        {title}
+      </h3>
+      <p className="text-gray-600 dark:text-gray-300 mb-6 max-w-md">
+        {message}
+      </p>
 
       {onRetry && (
         <button

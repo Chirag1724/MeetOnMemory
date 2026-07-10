@@ -388,7 +388,13 @@ const Navbar = () => {
             <button
               onClick={toggleTheme}
               className="w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-              aria-label="Toggle theme"
+              aria-label={
+                mounted
+                  ? theme === "light"
+                    ? "Switch to dark mode"
+                    : "Switch to light mode"
+                  : "Toggle theme"
+              }
             >
               {mounted && theme === "light" ? (
                 <Moon className="w-5 h-5" />
@@ -417,7 +423,7 @@ const Navbar = () => {
                   >
                     <Bell className="w-5 h-5" />
                     {unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-white animate-pulse">
+                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-white dark:border-gray-800 animate-pulse">
                         {unreadCount}
                       </span>
                     )}

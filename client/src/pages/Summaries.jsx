@@ -175,27 +175,27 @@ const Summaries = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
       <Navbar />
 
       {/* Centered Container */}
       <div className="flex flex-col items-center justify-center flex-grow px-6 py-20 md:py-28">
         <div className="w-full max-w-5xl text-center">
           {/* Header */}
-          <h1 className="text-4xl font-bold text-gray-900 mb-3 flex items-center justify-center gap-2">
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-3 flex items-center justify-center gap-2">
             🧠{" "}
             <span className="bg-gradient-to-r from-purple-600 to-blue-500 bg-clip-text text-transparent">
               AI Meeting Summaries
             </span>
           </h1>
-          <p className="text-gray-600 mb-8">
+          <p className="text-gray-600 dark:text-gray-400 mb-8">
             Review automatically generated <b>Minutes of Meeting</b>, action
             items, and insights from all recorded sessions.
           </p>
 
           {/* 🔍 Search Bar with Voice + Text */}
           <div className="flex items-center justify-center mb-10">
-            <div className="flex items-center w-full sm:w-[30rem] bg-white shadow-sm border border-gray-200 rounded-full overflow-hidden hover:ring-2 hover:ring-blue-300 transition">
+            <div className="flex items-center w-full sm:w-[30rem] bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-full overflow-hidden hover:ring-2 hover:ring-blue-300 transition">
               <input
                 type="text"
                 placeholder="Search meetings by title or keyword..."

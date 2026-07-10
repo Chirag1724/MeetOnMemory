@@ -148,7 +148,7 @@ const Dashboard = () => {
             className="pointer-events-none absolute -bottom-10 -left-10 h-48 w-48 rounded-full bg-violet-200/25 dark:bg-violet-900/20 blur-3xl"
           />
 
-          <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+          <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
             <div
               aria-hidden="true"
               className="h-1 bg-linear-to-r from-blue-600 via-violet-600 to-indigo-600"
@@ -167,7 +167,7 @@ const Dashboard = () => {
 
                   <div className="min-w-0 space-y-2">
                     <div className="flex flex-wrap items-center gap-2.5">
-                      <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">
+                      <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-gray-100 sm:text-3xl lg:text-4xl">
                         {organizationName}
                       </h1>
                       <span
@@ -180,9 +180,9 @@ const Dashboard = () => {
                         {displayRole}
                       </span>
                     </div>
-                    <p className="max-w-xl text-sm leading-relaxed text-slate-500 sm:text-base">
+                    <p className="max-w-xl text-sm leading-relaxed text-slate-500 dark:text-gray-400 sm:text-base">
                       Welcome back,{" "}
-                      <span className="font-semibold text-slate-800">
+                      <span className="font-semibold text-slate-800 dark:text-gray-200">
                         {userData?.name || "there"}
                       </span>
                       . Everything you need is right here.
@@ -193,7 +193,7 @@ const Dashboard = () => {
 
               {/* AI Smart Search — integrated CTA */}
               <div
-                className="mt-7 rounded-xl border border-slate-200/80 bg-slate-50/80 p-5 sm:mt-8 sm:p-6"
+                className="mt-7 rounded-xl border border-slate-200/80 dark:border-gray-700 bg-slate-50/80 dark:bg-gray-700/50 p-5 sm:mt-8 sm:p-6"
                 role="region"
                 aria-label="AI Smart Search"
               >
@@ -201,21 +201,21 @@ const Dashboard = () => {
                   <div className="flex items-start gap-4">
                     <div
                       aria-hidden="true"
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-slate-200/80"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white dark:bg-gray-800 shadow-sm ring-1 ring-slate-200/80 dark:ring-gray-600"
                     >
-                      <Search className="h-5 w-5 text-blue-600" />
+                      <Search className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div className="space-y-1.5">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="text-base font-semibold text-slate-900 sm:text-lg">
+                        <h2 className="text-base font-semibold text-slate-900 dark:text-gray-100 sm:text-lg">
                           Smart Search
                         </h2>
-                        <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-blue-700">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300">
                           <Sparkles className="h-3 w-3" aria-hidden="true" />
                           AI-Powered
                         </span>
                       </div>
-                      <p className="max-w-lg text-sm leading-relaxed text-slate-500">
+                      <p className="max-w-lg text-sm leading-relaxed text-slate-500 dark:text-gray-400">
                         Instantly find insights across your meetings, summaries,
                         and policies — powered by AI.
                       </p>
@@ -244,10 +244,10 @@ const Dashboard = () => {
         {/* ── Feature Cards ── */}
         <section aria-label="Dashboard features">
           <header className="mb-6 sm:mb-8 fade-in-up stagger-2">
-            <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+            <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-gray-500">
               Features
             </p>
-            <h2 className="mt-1 text-xl font-semibold text-slate-900 sm:text-2xl">
+            <h2 className="mt-1 text-xl font-semibold text-slate-900 dark:text-gray-100 sm:text-2xl">
               Everything you need, in one place
             </h2>
           </header>
@@ -273,7 +273,7 @@ const Dashboard = () => {
                       handleCardClick(card.id);
                     }
                   }}
-                  className={`dash-card fade-in-up ${staggerClass} group relative flex min-h-[220px] cursor-pointer flex-col rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm ring-1 ring-transparent transition-all duration-200 hover:-translate-y-1 hover:border-slate-300/80 hover:shadow-md focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 sm:p-6 ${card.accentRing}`}
+                  className={`dash-card fade-in-up ${staggerClass} group relative flex min-h-[220px] cursor-pointer flex-col rounded-xl border border-slate-200/80 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 shadow-sm ring-1 ring-transparent transition-all duration-200 hover:-translate-y-1 hover:border-slate-300/80 dark:hover:border-gray-600 hover:shadow-md focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 sm:p-6 ${card.accentRing}`}
                 >
                   <div className="mb-4 flex items-start justify-between gap-3">
                     <div
@@ -292,15 +292,15 @@ const Dashboard = () => {
                   </div>
 
                   <div className="flex flex-1 flex-col">
-                    <h3 className="mb-2 text-base font-semibold leading-snug text-slate-900">
+                    <h3 className="mb-2 text-base font-semibold leading-snug text-slate-900 dark:text-gray-100">
                       {card.title}
                     </h3>
-                    <p className="flex-1 text-sm leading-relaxed text-slate-500">
+                    <p className="flex-1 text-sm leading-relaxed text-slate-500 dark:text-gray-400">
                       {card.description}
                     </p>
                   </div>
 
-                  <div className="mt-5 flex items-center gap-1.5 border-t border-slate-100 pt-4 text-xs font-semibold text-slate-400 transition-colors duration-200 group-hover:text-blue-600">
+                  <div className="mt-5 flex items-center gap-1.5 border-t border-slate-100 dark:border-gray-700 pt-4 text-xs font-semibold text-slate-400 dark:text-gray-500 transition-colors duration-200 group-hover:text-blue-600 dark:group-hover:text-blue-400">
                     <span>Open</span>
                     <ArrowRight
                       className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5"

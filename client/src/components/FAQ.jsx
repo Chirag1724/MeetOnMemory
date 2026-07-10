@@ -169,11 +169,11 @@ export default function FAQ() {
         </div>
 
         {/* CTA below FAQ */}
-        <div className="mt-14 text-center p-8 rounded-2xl bg-linear-to-br from-blue-50 to-violet-50 border border-blue-100">
-          <h3 className="text-xl font-bold text-gray-900 mb-2">
+        <div className="mt-14 text-center p-8 rounded-2xl bg-linear-to-br from-blue-50 to-violet-50 dark:from-blue-900/20 dark:to-violet-900/20 border border-blue-100 dark:border-blue-800">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
             Still have questions?
           </h3>
-          <p className="text-gray-500 text-sm mb-6">
+          <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
             Try MeetOnMemory yourself — no credit card required.
           </p>
           <button

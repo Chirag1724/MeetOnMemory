@@ -38,17 +38,6 @@ export const AppContextProvider = ({ children }) => {
 
   const getAuthState = useCallback(async () => {
     try {
-      // Fetch CSRF token first
-      try {
-        const { data: csrfData } = await authApi.getCsrfToken();
-        if (csrfData && csrfData.csrfToken) {
-          apiClient.defaults.headers.common["X-CSRF-Token"] = csrfData.csrfToken;
-        }
-      } catch (csrfErr) {
-        console.error("Failed to fetch CSRF token", csrfErr);
-        toast.error("Failed to initialize secure session. Please check your connection and refresh.");
-      }
-
       const { data } = await authApi.getAuthState();
 
       if (data.success) {

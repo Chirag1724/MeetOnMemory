@@ -28,7 +28,6 @@ import { initVectorStore } from "./utils/embeddingUtils.js";
 import meetingSocket from "./socket/meetingSocket.js";
 import { initRedis } from "./services/redisService.js";
 import { globalLimiter } from "./middleware/rateLimiter.js";
-import knowledgeRoutes from "./routes/knowledgeRoutes.js";
 import path from "path";
 import { fileURLToPath } from "url";
 

@@ -1,9 +1,13 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Building2, Users, Clock, Shield } from "lucide-react";
+import { organizationApi } from "../../services";
+import { toast } from "react-toastify";
+import AppContent from "../../context/AppContent";
 
 const OrganizationCard = ({ organization }) => {
   const navigate = useNavigate();
+  const { getUserData, setUserData, userData } = React.useContext(AppContent);
 
   if (!organization) return null;
 
@@ -44,9 +48,39 @@ const OrganizationCard = ({ organization }) => {
     return activityDate.toLocaleDateString();
   };
 
+  const handleCardClick = async () => {
+    try {
+      // If user already has this org selected, just navigate
+      if (userData?.organization?._id === _id) {
+        navigate("/dashboard");
+        return;
+      }
+
+      // Otherwise, select the organization first
+      const { data } = await organizationApi.selectOrganization({
+        organizationId: _id,
+      });
+
+      if (data.success) {
+        const updatedUser = await getUserData();
+        if (updatedUser) {
+          setUserData(updatedUser);
+          localStorage.setItem("userData", JSON.stringify(updatedUser));
+        }
+        toast.success(`Switched to ${name}`);
+        navigate("/dashboard");
+      } else {
+        toast.error(data.message || "Failed to select organization");
+      }
+    } catch (error) {
+      console.error("Failed to select organization:", error);
+      toast.error("Failed to select organization");
+    }
+  };
+
   return (
     <div
-      onClick={() => navigate(`/dashboard`)}
+      onClick={handleCardClick}
       className="group relative bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-xl hover:border-blue-300 dark:hover:border-blue-600 transition-all duration-300 cursor-pointer"
     >
       {/* Organization Header */}

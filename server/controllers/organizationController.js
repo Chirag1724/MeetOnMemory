@@ -230,6 +230,66 @@ export const joinOrganization = async (req, res) => {
 };
 
 /**
+ * ✅ Select organization (for users with multiple orgs)
+ * Body: { organizationId: "<org id>" }
+ */
+export const selectOrganization = async (req, res) => {
+  try {
+    const { organizationId } = req.body;
+
+    if (!req.user || !req.user.id) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Authentication failed." });
+    }
+
+    if (!organizationId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "organizationId is required." });
+    }
+
+    const userId = req.user.id;
+
+    const organization = await Organization.findById(organizationId);
+    if (!organization) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Organization not found." });
+    }
+
+    const isMember = organization.members.some(
+      (m) => m.toString() === userId.toString(),
+    );
+
+    if (!isMember) {
+      return res
+        .status(403)
+        .json({ success: false, message: "You are not a member of this organization." });
+    }
+
+    // Update user's selected organization
+    await userModel.findByIdAndUpdate(userId, {
+      organization: organization._id,
+      hasCompletedOnboarding: true,
+    });
+
+    const updatedUser = await userModel
+      .findById(userId)
+      .populate("organization", "name");
+
+    res.status(200).json({
+      success: true,
+      message: "Organization selected successfully.",
+      userData: updatedUser,
+    });
+  } catch (error) {
+    console.error("❌ Error selecting organization:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+/**
  * ✅ Get organization members
  * Returns: { success: true, members: [...] }
  */

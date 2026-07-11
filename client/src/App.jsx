@@ -12,6 +12,7 @@ import ResetPassword from "./pages/ResetPassword.jsx";
 // --- Protected Pages ---
 import MeetingListPage from "./pages/MeetingListPage.jsx";
 import OrganizationHub from "./pages/OrganizationHub.jsx";
+import JoinOrganizationPage from "./pages/JoinOrganizationPage.jsx";
 import CreateOrganizationPage from "./pages/CreateOrganizationPage.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 
@@ -152,6 +153,14 @@ const App = () => {
             element={
               <ProtectedRoute>
                 <OrganizationHub />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/join-organization"
+            element={
+              <ProtectedRoute>
+                <JoinOrganizationPage />
               </ProtectedRoute>
             }
           />

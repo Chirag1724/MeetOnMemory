@@ -126,17 +126,36 @@ export const getComplianceFlags = async (req, res) => {
     }
 
     const { status = "potential_conflict", classification } = req.query;
-    const allowedStatuses = ["unresolved", "acknowledged", "dismissed", "all"];
+
+    const allowedStatuses = [
+       "unresolved",
+       "acknowledged",
+       "dismissed",
+       "all",
+    ];
+
+    const allowedClassifications = [
+       "potential_conflict",
+       "aligned",
+       "reference",
+       "unrelated",
+        "all",
+      ];
 
     if (!allowedStatuses.includes(status)) {
       return res.status(400).json({ success: false, message: "Invalid status" });
     }
 
-    const query = { organization };
-    if (status !== "all") query.status = status;
-
-    // By default this endpoint surfaces conflict flags; callers can widen
-    // via ?classification=all to see aligned/references/unrelated rows too.
+    if (
+     classification &&
+     !allowedClassifications.includes(classification)
+    ) {
+      return res.status(400).json({
+       success: false,
+       message: "Invalid classification",
+      });
+      }
+      
     if (classification && classification !== "all") {
       query.classification = classification;
     } else if (!classification) {

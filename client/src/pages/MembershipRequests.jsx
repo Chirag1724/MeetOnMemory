@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { membershipRequestApi } from "../services";
 import { toast } from "react-toastify";
-import Navbar from "../components/Navbar";
 import {
   Users,
   Clock,
@@ -15,6 +13,8 @@ import {
   AlertCircle,
   ExternalLink,
 } from "lucide-react";
+import Navbar from "../components/Navbar.jsx";
+import { membershipRequestApi } from "../services";
 
 const STATUS_STYLES = {
   pending: "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800",

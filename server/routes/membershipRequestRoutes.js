@@ -7,6 +7,8 @@ import {
   approveMembershipRequest,
   rejectMembershipRequest,
   cancelMembershipRequest,
+  bulkApproveMembershipRequests,
+  bulkRejectMembershipRequests,
 } from "../controllers/membershipRequestController.js";
 import userAuth from "../middleware/userAuth.js";
 import { apiLimiter } from "../middleware/rateLimiter.js";
@@ -30,5 +32,9 @@ router.get("/user", getUserMembershipRequests);
 router.patch("/:id/approve", approveMembershipRequest);
 router.patch("/:id/reject", rejectMembershipRequest);
 router.patch("/:id/cancel", cancelMembershipRequest);
+
+// Bulk actions
+router.post("/bulk-approve", bulkApproveMembershipRequests);
+router.post("/bulk-reject", bulkRejectMembershipRequests);
 
 export default router;

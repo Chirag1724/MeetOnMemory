@@ -1,5 +1,3 @@
-import { test, describe } from "node:test";
-import assert from "node:assert/strict";
 import {
   parseClassification,
   buildClassificationPrompt,
@@ -13,15 +11,15 @@ describe("parseClassification", () => {
       reasoning: "Exceeds the pre-approval threshold.",
     });
     const result = parseClassification(raw);
-    assert.equal(result.classification, "potential_conflict");
-    assert.equal(result.reasoning, "Exceeds the pre-approval threshold.");
+    expect(result.classification).toBe("potential_conflict");
+    expect(result.reasoning).toBe("Exceeds the pre-approval threshold.");
   });
 
   test("strips markdown code fences before parsing", () => {
     const raw =
       '```json\n{"classification":"aligned","reasoning":"Matches policy."}\n```';
     const result = parseClassification(raw);
-    assert.equal(result.classification, "aligned");
+    expect(result.classification).toBe("aligned");
   });
 
   test("falls back to 'unrelated' for an unrecognized classification value", () => {
@@ -32,14 +30,14 @@ describe("parseClassification", () => {
       reasoning: "should not be trusted",
     });
     const result = parseClassification(raw);
-    assert.equal(result.classification, "unrelated");
+    expect(result.classification).toBe("unrelated");
   });
 
   test("fails conservative (unrelated) on unparsable input", () => {
     // A malformed/empty LLM response must never silently become a conflict flag.
     const result = parseClassification("not valid json at all {{{");
-    assert.equal(result.classification, "unrelated");
-    assert.match(result.reasoning, /could not be parsed/i);
+    expect(result.classification).toBe("unrelated");
+    expect(result.reasoning).toMatch(/could not be parsed/i);
   });
 
   test("truncates excessively long reasoning text", () => {
@@ -49,14 +47,14 @@ describe("parseClassification", () => {
       reasoning: longReasoning,
     });
     const result = parseClassification(raw);
-    assert.ok(result.reasoning.length <= 1000);
+    expect(result.reasoning.length).toBeLessThanOrEqual(1000);
   });
 
   test("handles missing reasoning field gracefully", () => {
     const raw = JSON.stringify({ classification: "unrelated" });
     const result = parseClassification(raw);
-    assert.equal(result.classification, "unrelated");
-    assert.equal(result.reasoning, "");
+    expect(result.classification).toBe("unrelated");
+    expect(result.reasoning).toBe("");
   });
 });
 
@@ -73,11 +71,11 @@ describe("buildClassificationPrompt", () => {
       policy,
     );
 
-    assert.match(prompt, /Approved a \$1,200 purchase without pre-approval\./);
-    assert.match(prompt, /Expense Reimbursement Policy/);
-    assert.match(prompt, /version 2\.0/);
-    assert.match(prompt, /Requires pre-approval above \$500\./);
-    assert.match(prompt, /Raised threshold from \$250 to \$500/);
+    expect(prompt).toMatch(/Approved a \$1,200 purchase without pre-approval\./);
+    expect(prompt).toMatch(/Expense Reimbursement Policy/);
+    expect(prompt).toMatch(/version 2\.0/);
+    expect(prompt).toMatch(/Requires pre-approval above \$500\./);
+    expect(prompt).toMatch(/Raised threshold from \$250 to \$500/);
   });
 
   test("instructs conservative bias against false conflict flags", () => {
@@ -87,8 +85,8 @@ describe("buildClassificationPrompt", () => {
       summary: "",
       key_changes: [],
     });
-    assert.match(prompt, /conservative/i);
-    assert.match(prompt, /only use this if genuinely confident/i);
+    expect(prompt).toMatch(/conservative/i);
+    expect(prompt).toMatch(/only use this if genuinely confident/i);
   });
 
   test("requests strict JSON output matching the four-way enum", () => {
@@ -98,18 +96,18 @@ describe("buildClassificationPrompt", () => {
       summary: "",
       key_changes: [],
     });
-    assert.match(prompt, /"aligned" \| "references" \| "potential_conflict" \| "unrelated"/);
+    expect(prompt).toMatch(/"aligned" \| "references" \| "potential_conflict" \| "unrelated"/);
   });
 
   test("handles a policy with no key_changes without throwing", () => {
-    assert.doesNotThrow(() =>
+    expect(() =>
       buildClassificationPrompt("decision text", {
         name: "Policy",
         version: "1.0",
         summary: "summary text",
         key_changes: undefined,
       }),
-    );
+    ).not.toThrow();
   });
 });
 
@@ -125,22 +123,21 @@ describe("hand-labeled fixture set", () => {
   for (const fixture of fixtures) {
     test(`prompt for fixture "${fixture.id}" is well-formed`, () => {
       const prompt = buildClassificationPrompt(fixture.decisionText, fixture.policy);
-      assert.match(prompt, new RegExp(fixture.policy.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-      assert.ok(prompt.includes(fixture.decisionText));
-      assert.ok(
+      expect(prompt).toMatch(new RegExp(fixture.policy.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+      expect(prompt.includes(fixture.decisionText)).toBe(true);
+      expect(
         ["aligned", "references", "potential_conflict", "unrelated"].includes(
           fixture.expectedClassification,
         ),
-        `fixture "${fixture.id}" has an invalid expectedClassification label`,
-      );
+      ).toBe(true);
     });
   }
 
   test("fixture set covers all four classification labels", () => {
     const labels = new Set(fixtures.map((f) => f.expectedClassification));
-    assert.ok(labels.has("aligned"));
-    assert.ok(labels.has("references"));
-    assert.ok(labels.has("potential_conflict"));
-    assert.ok(labels.has("unrelated"));
+    expect(labels.has("aligned")).toBe(true);
+    expect(labels.has("references")).toBe(true);
+    expect(labels.has("potential_conflict")).toBe(true);
+    expect(labels.has("unrelated")).toBe(true);
   });
 });

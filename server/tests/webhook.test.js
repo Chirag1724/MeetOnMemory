@@ -2,6 +2,7 @@ import request from "supertest";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import axios from "axios";
+import { jest } from "@jest/globals";
 import { app } from "../server.js";
 import User from "../models/userModel.js";
 import Organization from "../models/organizationModel.js";

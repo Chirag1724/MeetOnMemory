@@ -33,6 +33,7 @@ import { initRedis } from "./services/redisService.js";
 import { initAIWorker } from "./services/queueService.js";
 import { initWebhookWorker } from "./services/webhookDispatcherService.js";
 import { globalLimiter } from "./middleware/rateLimiter.js";
+import errorHandler from "./middleware/errorHandler.js";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -224,21 +225,7 @@ if (process.env.NODE_ENV !== "test") {
 // ================================
 // ERROR HANDLER
 // ================================
-app.use((err, req, res, next) => {
-  console.error(err);
-
-  if (err.code === "EBADCSRFTOKEN") {
-    return res.status(403).json({
-      success: false,
-      message: "CSRF token validation failed.",
-    });
-  }
-
-  res.status(500).json({
-    success: false,
-    message: err.message || "Internal Server Error",
-  });
-});
+app.use(errorHandler);
 
 // ================================
 // GRACEFUL SHUTDOWN

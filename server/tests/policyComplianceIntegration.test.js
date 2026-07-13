@@ -10,20 +10,19 @@
 // The pure-logic tests in policyComplianceService.test.js run unconditionally
 // and don't need this setup.
 
-import { test, describe, before, after } from "node:test";
-import assert from "node:assert/strict";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 
 dotenv.config();
 
 const RUN_IT = process.env.RUN_POLICY_COMPLIANCE_IT === "1";
+const describeOrSkip = RUN_IT ? describe : describe.skip;
 
-describe("policy compliance — integration", { skip: !RUN_IT }, () => {
+describeOrSkip("policy compliance — integration", () => {
   let embedText, indexPolicy, removePolicyFromIndex, checkDecisionAgainstPolicies;
   let Policy, Decision, PolicyCompliance;
 
-  before(async () => {
+  beforeAll(async () => {
     ({ embedText } = await import("../utils/embeddingUtils.js"));
     ({ indexPolicy, removePolicyFromIndex, checkDecisionAgainstPolicies } =
       await import("../services/policyComplianceService.js"));
@@ -31,18 +30,18 @@ describe("policy compliance — integration", { skip: !RUN_IT }, () => {
     Decision = (await import("../models/decisionModel.js")).default;
     PolicyCompliance = (await import("../models/policyComplianceModel.js")).default;
 
-    await mongoose.connect(process.env.MONGODB_URI);
+    await mongoose.connect(process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/test");
   });
 
-  after(async () => {
+  afterAll(async () => {
     await mongoose.disconnect();
   });
 
   test("embedding pipeline produces a consistent-length vector", async () => {
     const a = await embedText("Expense reimbursements require pre-approval above $500.");
     const b = await embedText("A completely unrelated sentence about lunch catering.");
-    assert.ok(a.length > 0);
-    assert.equal(a.length, b.length);
+    expect(a.length).toBeGreaterThan(0);
+    expect(a.length).toBe(b.length);
   });
 
   test("similarity matching only surfaces same-organization policies", async () => {
@@ -86,8 +85,8 @@ describe("policy compliance — integration", { skip: !RUN_IT }, () => {
     // Every flag produced must point at a policy in orgA — never orgB,
     // even though policyB has near-identical text and would otherwise match.
     for (const flag of flags) {
-      assert.equal(flag.organization.toString(), orgA.toString());
-      assert.notEqual(flag.policyId.toString(), policyB._id.toString());
+      expect(flag.organization.toString()).toBe(orgA.toString());
+      expect(flag.policyId.toString()).not.toBe(policyB._id.toString());
     }
 
     await PolicyCompliance.deleteMany({ decisionId: decision._id });

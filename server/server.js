@@ -171,14 +171,19 @@ if (process.env.NODE_ENV !== "test") {
     console.log(`🚀 MeetOnMemory Server running on port ${PORT}`);
 
     // Asynchronously initialize background services after server starts listening
-    initRedis();
-    initAIWorker(app);
-    initDataExportWorker(app);
-    initWebhookWorker();
+    const safeInit = async (name, initFn) => {
+      try {
+        await initFn();
+      } catch (err) {
+        console.error(`⚠️ Failed to initialize background service "${name}":`, err.message || err);
+      }
+    };
 
-    initVectorStore().catch((err) => {
-      console.error("⚠️ Failed to pre-warm vector store:", err.message);
-    });
+    safeInit("Redis", () => initRedis());
+    safeInit("AI Worker", () => initAIWorker(app));
+    safeInit("Data Export Worker", () => initDataExportWorker(app));
+    safeInit("Webhook Worker", () => initWebhookWorker());
+    safeInit("Vector Store", () => initVectorStore());
   });
 }
 

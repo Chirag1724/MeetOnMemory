@@ -27,6 +27,11 @@ export const initVectorStore = async () => {
     throw new Error("Missing PINECONE_API_KEY in .env");
   }
 
+  if (!PINECONE_INDEX) {
+    console.error("❌ Missing INDEX_NAME/PINECONE_INDEX in .env");
+    throw new Error("Missing INDEX_NAME/PINECONE_INDEX in .env");
+  }
+
   try {
     if (!pineconeClient) {
       pineconeClient = new Pinecone({ apiKey: PINECONE_API_KEY });

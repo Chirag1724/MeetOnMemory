@@ -7,27 +7,42 @@ import eventBus from "./eventBus.js";
 
 const redisUri = process.env.REDIS_URI;
 
-let _connection = null;
+let _producerConnection = null;
+let _workerConnection = null;
 let _webhookQueueInstance = null;
 
-function getConnection() {
+function getProducerConnection() {
   if (!redisUri) return null;
-  if (!_connection) {
-    _connection = new Redis(redisUri, {
-      maxRetriesPerRequest: null,
+  if (!_producerConnection) {
+    _producerConnection = new Redis(redisUri, {
+      maxRetriesPerRequest: 3, // Fail fast for requests adding tasks to queue
       family: 0,
     });
-    _connection.on("error", (err) => {
-      console.error("⚠️ Webhook Redis Connection Error:", err.message);
+    _producerConnection.on("error", (err) => {
+      console.error("⚠️ Webhook Producer Redis Connection Error:", err.message);
     });
   }
-  return _connection;
+  return _producerConnection;
+}
+
+function getWorkerConnection() {
+  if (!redisUri) return null;
+  if (!_workerConnection) {
+    _workerConnection = new Redis(redisUri, {
+      maxRetriesPerRequest: null, // Unlimited retries for background workers
+      family: 0,
+    });
+    _workerConnection.on("error", (err) => {
+      console.error("⚠️ Webhook Worker Redis Connection Error:", err.message);
+    });
+  }
+  return _workerConnection;
 }
 
 function getWebhookQueue() {
   if (!redisUri) return null;
   if (!_webhookQueueInstance) {
-    const conn = getConnection();
+    const conn = getProducerConnection();
     if (conn) {
       _webhookQueueInstance = new Queue("webhook-dispatches", { connection: conn });
     }
@@ -43,6 +58,9 @@ export const webhookQueue = {
       return null;
     }
     return await q.add(...args);
+  },
+  get isActive() {
+    return getWebhookQueue() !== null;
   }
 };
 
@@ -134,7 +152,7 @@ export const dispatchWebhookEvent = async (organizationId, event, data) => {
     };
 
     for (const webhook of webhooks) {
-      if (webhookQueue) {
+      if (getWebhookQueue()) {
         // Add to BullMQ with exponential backoff retries for reliability
         await webhookQueue.add(
           "dispatch-webhook",
@@ -166,7 +184,7 @@ export const dispatchWebhookEvent = async (organizationId, event, data) => {
  * Initializes the Webhook worker listening on the dispatch queue.
  */
 export const initWebhookWorker = () => {
-  const connection = getConnection();
+  const connection = getWorkerConnection();
   if (!connection) {
     console.warn(
       "⚠️ Redis not configured. Webhook background worker will not start (falling back to sync dispatch).",

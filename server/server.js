@@ -54,6 +54,7 @@ dotenv.config({ path: envPath });
 dotenv.config();
 
 const app = express();
+app.set("trust proxy", 1); // Trust first proxy hop (Render, Vercel)
 const PORT = process.env.PORT || 4000;
 
 // DATABASE & CACHE

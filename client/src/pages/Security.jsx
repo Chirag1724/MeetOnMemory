@@ -21,8 +21,9 @@ import {
   Info,
   Sliders,
   AlertOctagon,
-  EyeOff,
-  UserCheck
+  UserCheck,
+  Scale,
+  Globe
 } from "lucide-react";
 
 const Security = () => {

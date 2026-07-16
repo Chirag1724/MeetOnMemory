@@ -38,7 +38,6 @@ const Privacy = () => {
     functional: false,
     aiModelTraining: false,
   });
-  const [consentSaved, setConsentSaved] = useState(false);
   const [showConsentToast, setShowConsentToast] = useState(false);
 
   // References for scroll detection
@@ -316,7 +315,6 @@ We are committed to resolving any complaints or inquiries about your privacy and
 
   // Cookie Preference Save Handler
   const handleSaveConsent = () => {
-    setConsentSaved(true);
     setShowConsentToast(true);
     setTimeout(() => {
       setShowConsentToast(false);

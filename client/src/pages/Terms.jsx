@@ -21,8 +21,8 @@ import {
   CreditCard,
   Cpu,
   Fingerprint,
-  Mail,
-  Award
+  Award,
+  Server
 } from "lucide-react";
 
 const Terms = () => {

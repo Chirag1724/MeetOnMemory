@@ -26,56 +26,23 @@ import {
   FileSignature
 } from "lucide-react";
 
-const Privacy = () => {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [activeSection, setActiveSection] = useState("introduction");
-  const [expandedFaq, setExpandedFaq] = useState(null);
-  
-  // Consent Manager State
-  const [cookieConsent, setCookieConsent] = useState({
-    essential: true,
-    analytics: true,
-    functional: false,
-    aiModelTraining: false,
-  });
-  const [consentSaved, setConsentSaved] = useState(false);
-  const [showConsentToast, setShowConsentToast] = useState(false);
-
-  // References for scroll detection
-  const sectionRefs = {
-    introduction: useRef(null),
-    dataCollect: useRef(null),
-    aiProcessing: useRef(null),
-    vectorStorage: useRef(null),
-    dataUsage: useRef(null),
-    orgAccess: useRef(null),
-    dataRetention: useRef(null),
-    cookiesStorage: useRef(null),
-    dataSecurity: useRef(null),
-    intlTransfers: useRef(null),
-    userRights: useRef(null),
-    childrenPrivacy: useRef(null),
-    policyChanges: useRef(null),
-    contactUs: useRef(null),
-  };
-
-  // Sections data
-  const sections = [
-    {
-      id: "introduction",
-      title: "1. Introduction & Scope",
-      icon: Globe,
-      content: `Welcome to MeetOnMemory. We respect your privacy and are committed to protecting your personal data. This Privacy Policy describes how MeetOnMemory ("we", "us", or "our") collects, uses, processes, and protects your information when you use our web application, services, and associated websites (collectively, the "Service"). 
+// Sections data
+const sections = [
+  {
+    id: "introduction",
+    title: "1. Introduction & Scope",
+    icon: Globe,
+    content: `Welcome to MeetOnMemory. We respect your privacy and are committed to protecting your personal data. This Privacy Policy describes how MeetOnMemory ("we", "us", or "our") collects, uses, processes, and protects your information when you use our web application, services, and associated websites (collectively, the "Service"). 
 
 MeetOnMemory is an AI-powered knowledge management and collaboration platform designed to convert meeting recordings, transcripts, notes, and organizational documents into structured, searchable knowledge databases. This policy applies to all visitors, registered users, and organizations who access or use the Service.
 
 By accessing or using our Service, you agree to the collection and use of information in accordance with this Privacy Policy. If you do not agree with the terms outlined here, please refrain from using MeetOnMemory.`,
-    },
-    {
-      id: "dataCollect",
-      title: "2. Data We Collect",
-      icon: FileText,
-      content: `To provide our intelligent meeting processing features, we collect several categories of information:
+  },
+  {
+    id: "dataCollect",
+    title: "2. Data We Collect",
+    icon: FileText,
+    content: `To provide our intelligent meeting processing features, we collect several categories of information:
 
 A. Account Registration Information:
 When you register for an account, we collect your full name, email address, password hash, and profile picture (if provided). If you log in via third-party providers (such as Google), we receive authentication tokens and profile information authorized by that provider.
@@ -88,12 +55,12 @@ We collect administrative metadata related to your meetings, such as meeting tit
 
 D. Usage and Technical Data:
 We automatically collect technical data when you interact with the Service, including your IP address, browser type, operating system, pages visited, timestamps, clickstreams, and preferred language.`,
-    },
-    {
-      id: "aiProcessing",
-      title: "3. AI Processing & Third-Party Models",
-      icon: Server,
-      content: `MeetOnMemory utilizes advanced Large Language Models (LLMs) and artificial intelligence technology (such as Google Gemini APIs) to transcribe meeting audio, summarize transcripts, extract key decisions, and compile structured reports.
+  },
+  {
+    id: "aiProcessing",
+    title: "3. AI Processing & Third-Party Models",
+    icon: Server,
+    content: `MeetOnMemory utilizes advanced Large Language Models (LLMs) and artificial intelligence technology (such as Google Gemini APIs) to transcribe meeting audio, summarize transcripts, extract key decisions, and compile structured reports.
 
 A. Processing Pipeline:
 When an audio recording or transcript is uploaded, it is sent securely to our servers, parsed, and forwarded via encrypted connections (HTTPS) to our AI processing providers for analysis.
@@ -103,12 +70,12 @@ We contractually ensure that the personal data, meeting audio, and meeting trans
 
 C. Transcriptions:
 Audio files are transcribed using high-accuracy speech-to-text models. During this process, acoustic data is converted into text data for indexing and summarization.`,
-    },
-    {
-      id: "vectorStorage",
-      title: "4. Vector Database & Semantic Indexes",
-      icon: Sliders,
-      content: `To power our natural language Smart AI Search, MeetOnMemory uses vector search technology:
+  },
+  {
+    id: "vectorStorage",
+    title: "4. Vector Database & Semantic Indexes",
+    icon: Sliders,
+    content: `To power our natural language Smart AI Search, MeetOnMemory uses vector search technology:
 
 A. Embedding Generation:
 Transcripts and policy documents are broken down into chunks, and each chunk is converted into a high-dimensional vector representation (embedding) using machine learning embedding models.
@@ -118,12 +85,12 @@ These embeddings, along with minimal metadata reference keys (such as chunk text
 
 C. Isolation:
 We partition vectors by Organization ID. This guarantees logical isolation, ensuring that users can never retrieve search results or metadata from organizations to which they do not belong.`,
-    },
-    {
-      id: "dataUsage",
-      title: "5. How We Use Your Information",
-      icon: Info,
-      content: `We use the collected information for the following business purposes:
+  },
+  {
+    id: "dataUsage",
+    title: "5. How We Use Your Information",
+    icon: Info,
+    content: `We use the collected information for the following business purposes:
 
 - Service Delivery: To create your user account, manage organization workspaces, and host real-time collaborative meetings.
 - AI Summarization & Extraction: To transcribe audio, summarize key highlights, generate action items, and detect policy compliance.
@@ -131,12 +98,12 @@ We partition vectors by Organization ID. This guarantees logical isolation, ensu
 - Communications: To send system notifications, password reset links, invitations, and updates about your workspace activities.
 - Security & Compliance: To detect and prevent fraudulent access, monitor system performance, and enforce role-based access control.
 - Product Improvement: To analyze anonymous usage trends and optimize our web application interface, page response times, and processing pipelines.`,
-    },
-    {
-      id: "orgAccess",
-      title: "6. Workspace Access Controls",
-      icon: FileLock,
-      content: `MeetOnMemory is built around collaborative Organizations. It is important to understand how your data is shared inside these workspaces:
+  },
+  {
+    id: "orgAccess",
+    title: "6. Workspace Access Controls",
+    icon: FileLock,
+    content: `MeetOnMemory is built around collaborative Organizations. It is important to understand how your data is shared inside these workspaces:
 
 A. Role-Based Access Control (RBAC):
 Each organization has owners, administrators, and members. Administrators control who has access to meeting records, transcripts, AI summaries, and reports.
@@ -145,12 +112,12 @@ Each organization has owners, administrators, and members. Administrators contro
 
 B. Public Profiles:
 Organizations can configure a public profile page showing public organization details, which is visible to non-registered visitors. No meeting audio, private transcripts, or AI summaries are ever published on public profiles.`,
-    },
-    {
-      id: "dataRetention",
-      title: "7. Data Retention & Deletion",
-      icon: Clock,
-      content: `We retain your personal data and meeting content only for as long as necessary to fulfill the purposes outlined in this Privacy Policy, or as required by law.
+  },
+  {
+    id: "dataRetention",
+    title: "7. Data Retention & Deletion",
+    icon: Clock,
+    content: `We retain your personal data and meeting content only for as long as necessary to fulfill the purposes outlined in this Privacy Policy, or as required by law.
 
 A. User-Initiated Deletion:
 - Users can edit or delete their profile information at any time.
@@ -159,12 +126,12 @@ A. User-Initiated Deletion:
 
 B. Account Closure:
 If you request the deletion of your user account, we will erase your registration details. However, meeting records or summaries you uploaded that are part of an active team workspace may be retained at the discretion of the organization administrator, as they constitute shared institutional knowledge.`,
-    },
-    {
-      id: "cookiesStorage",
-      title: "8. Cookies & Local Storage",
-      icon: Cookie,
-      content: `We use cookies and browser local storage to enhance your experience, maintain security, and remember your preferences:
+  },
+  {
+    id: "cookiesStorage",
+    title: "8. Cookies & Local Storage",
+    icon: Cookie,
+    content: `We use cookies and browser local storage to enhance your experience, maintain security, and remember your preferences:
 
 A. Essential Cookies:
 These are required for the basic operation of the Service, such as keeping you authenticated, protecting API endpoints, and maintaining CSRF protection tokens.
@@ -174,12 +141,12 @@ We use browser local storage to store configuration settings, such as your selec
 
 C. Analytical Cookies:
 With your consent, we use analytics cookies to compile aggregated statistics regarding website visits, referral pages, and feature utilization. You can manage your preferences using our interactive Consent Manager on this page.`,
-    },
-    {
-      id: "dataSecurity",
-      title: "9. Data Security & Encryption",
-      icon: Lock,
-      content: `The security of your data is paramount to us. We implement industry-standard security measures to guard against unauthorized access, alteration, disclosure, or destruction:
+  },
+  {
+    id: "dataSecurity",
+    title: "9. Data Security & Encryption",
+    icon: Lock,
+    content: `The security of your data is paramount to us. We implement industry-standard security measures to guard against unauthorized access, alteration, disclosure, or destruction:
 
 A. Encryption:
 - Data in Transit: All data sent between the browser and our servers is encrypted using Secure Sockets Layer/Transport Layer Security (SSL/TLS 1.2 or TLS 1.3) protocols.
@@ -190,22 +157,22 @@ Our server APIs verify authentication tokens and check strict permission matrice
 
 C. Vulnerability Management:
 We perform periodic packages audits and utilize automated code scanning tools to identify and remediate security vulnerabilities in our dependencies.`,
-    },
-    {
-      id: "intlTransfers",
-      title: "10. International Transfers",
-      icon: Globe,
-      content: `MeetOnMemory operates globally, and our server infrastructure is primarily located in secure cloud data centers in the United States and Europe.
+  },
+  {
+    id: "intlTransfers",
+    title: "10. International Transfers",
+    icon: Globe,
+    content: `MeetOnMemory operates globally, and our server infrastructure is primarily located in secure cloud data centers in the United States and Europe.
 
 If you access the Service from outside these regions, please note that the information we collect may be transferred to, stored, and processed in databases located in countries where data protection laws may differ from those in your jurisdiction.
 
 We implement standard contractual clauses and align with GDPR-compliant frameworks to ensure that your data receives an equivalent level of protection wherever it is processed.`,
-    },
-    {
-      id: "userRights",
-      title: "11. Your Rights & Choices",
-      icon: UserCheck,
-      content: `Depending on your location (such as the European Economic Area under GDPR or California under CCPA), you possess specific legal rights regarding your personal data:
+  },
+  {
+    id: "userRights",
+    title: "11. Your Rights & Choices",
+    icon: UserCheck,
+    content: `Depending on your location (such as the European Economic Area under GDPR or California under CCPA), you possess specific legal rights regarding your personal data:
 
 - Right of Access: You have the right to request copies of the personal data we hold about you.
 - Right to Rectification: You can request that we correct any information you believe is inaccurate or incomplete.
@@ -215,39 +182,55 @@ We implement standard contractual clauses and align with GDPR-compliant framewor
 - Right to Object: You have the right to object to our processing of your data for direct marketing or based on legitimate interests.
 
 To exercise any of these rights, please contact our privacy desk at privacy@meetonmemory.com. We respond to all requests within 30 days.`,
-    },
-    {
-      id: "childrenPrivacy",
-      title: "12. Children's Privacy",
-      icon: AlertTriangle,
-      content: `Our Service is not directed to individuals under the age of 16. We do not knowingly collect or solicit personal information from children under 16. 
+  },
+  {
+    id: "childrenPrivacy",
+    title: "12. Children's Privacy",
+    icon: AlertTriangle,
+    content: `Our Service is not directed to individuals under the age of 16. We do not knowingly collect or solicit personal information from children under 16. 
 
 If we learn that we have accidentally collected personal data from a child under 16 without verification of parental consent, we will take immediate steps to delete that information from our databases and vector storage caches. If you believe a child under 16 has provided personal data to us, please notify us immediately.`,
-    },
-    {
-      id: "policyChanges",
-      title: "13. Changes to this Policy",
-      icon: FileSignature,
-      content: `We may update our Privacy Policy from time to time to reflect changes in our technology, business practices, or regulatory requirements. 
+  },
+  {
+    id: "policyChanges",
+    title: "13. Changes to this Policy",
+    icon: FileSignature,
+    content: `We may update our Privacy Policy from time to time to reflect changes in our technology, business practices, or regulatory requirements. 
 
 When we make changes, we will post the updated policy on this page and revise the "Last Updated" date at the top. If the changes are material, we will provide a more prominent notice (such as sending an email notification or displaying a banner inside the user dashboard) before the changes go into effect.
 
 We encourage you to review this Privacy Policy periodically to stay informed about how we protect your information.`,
-    },
-    {
-      id: "contactUs",
-      title: "14. Contact Us & Support",
-      icon: Mail,
-      content: `If you have any questions, comments, or concerns about this Privacy Policy, our data processing workflows, or if you wish to report a security vulnerability, please get in touch with us:
+  },
+  {
+    id: "contactUs",
+    title: "14. Contact Us & Support",
+    icon: Mail,
+    content: `If you have any questions, comments, or concerns about this Privacy Policy, our data processing workflows, or if you wish to report a security vulnerability, please get in touch with us:
 
 - Email: privacy@meetonmemory.com
 - Security Reporting: security@meetonmemory.com
 - Office Address: MeetOnMemory Legal Department, 548 Market St, Suite 4839, San Francisco, CA 94104
 
 We are committed to resolving any complaints or inquiries about your privacy and our collection of personal data in a transparent and cooperative manner.`,
-    },
-  ];
+  },
+];
 
+const Privacy = () => {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeSection, setActiveSection] = useState("introduction");
+  const [expandedFaq, setExpandedFaq] = useState(null);
+  
+  // Consent Manager State
+  const [cookieConsent, setCookieConsent] = useState({
+    essential: true,
+    analytics: true,
+    functional: false,
+    aiModelTraining: false,
+  });
+  const [showConsentToast, setShowConsentToast] = useState(false);
+
+  // References for scroll detection
+  const sectionRefs = useRef({});
   // FAQ Accordion Data
   const faqs = [
     {
@@ -275,7 +258,7 @@ We are committed to resolving any complaints or inquiries about your privacy and
 
       for (let i = 0; i < sections.length; i++) {
         const sectionId = sections[i].id;
-        const element = sectionRefs[sectionId].current;
+        const element = sectionRefs.current[sectionId];
         if (element) {
           const top = element.offsetTop;
           const height = element.offsetHeight;
@@ -289,11 +272,11 @@ We are committed to resolving any complaints or inquiries about your privacy and
 
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [sections]);
+  }, []);
 
   // Handle sidebar link clicks with smooth offset scroll
   const scrollToSection = (id) => {
-    const element = sectionRefs[id].current;
+    const element = sectionRefs.current[id];
     if (element) {
       window.scrollTo({
         top: element.offsetTop - 100,
@@ -312,11 +295,10 @@ We are committed to resolving any complaints or inquiries about your privacy and
         sec.title.toLowerCase().includes(query) ||
         sec.content.toLowerCase().includes(query)
     );
-  }, [searchQuery, sections]);
+  }, [searchQuery]);
 
   // Cookie Preference Save Handler
   const handleSaveConsent = () => {
-    setConsentSaved(true);
     setShowConsentToast(true);
     setTimeout(() => {
       setShowConsentToast(false);
@@ -468,7 +450,9 @@ We are committed to resolving any complaints or inquiries about your privacy and
                   return (
                     <article
                       key={sec.id}
-                      ref={sectionRefs[sec.id]}
+                      ref={(el) => {
+                        sectionRefs.current[sec.id] = el;
+                      }}
                       className="scroll-mt-24 border-b border-gray-100 last:border-0 dark:border-slate-700/60 pb-8 last:pb-0"
                     >
                       <div className="flex items-center gap-3 mb-4">

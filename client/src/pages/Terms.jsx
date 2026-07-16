@@ -22,8 +22,186 @@ import {
   Cpu,
   Fingerprint,
   Mail,
-  Award
+  Award,
+  Server
 } from "lucide-react";
+
+// Sections data
+const sections = [
+  {
+    id: "agreement",
+    title: "1. Agreement & Eligibility",
+    icon: BookOpen,
+    content: `These Terms of Service ("Terms") constitute a legally binding agreement made between you, whether personally or on behalf of an entity ("you") and MeetOnMemory ("we", "us", or "our"), concerning your access to and use of the MeetOnMemory web application and associated services (the "Service").
+
+By accessing or using the Service, you acknowledge that you have read, understood, and agree to be bound by all of these Terms. If you do not agree with all of these Terms, you are explicitly prohibited from using the Service and must discontinue use immediately.
+
+Eligibility:
+To register for an account and use the Service, you must be at least 16 years of age (or the minimum legal age in your jurisdiction to consent to the processing of personal data). By creating an account, you warrant that you possess the legal capacity to enter into a binding contract and that all registration information you submit is accurate and truthful.`,
+  },
+  {
+    id: "serviceDesc",
+    title: "2. Service Description",
+    icon: Cpu,
+    content: `MeetOnMemory provides an AI-powered workspace platform that processes meeting records, media files, and transcripts. 
+
+Core features include:
+- Transcription Services: Converting voice recordings and video files into text transcripts.
+- AI Summarization: Generating Minutes of Meeting (MoM), summary reports, decision logs, and action items using machine learning models.
+- Semantic Search: Vectorizing document segments (transcripts and uploaded policies) to permit natural language queries.
+- Collaborative Workspaces: Setting up team organizations, browsing profiles, and sharing institutional knowledge.
+
+We reserve the right to modify, suspend, or discontinue any aspect of the Service at any time, with or without notice. We are not liable to you or any third party for any changes, pricing updates, or suspension of the Service.`,
+  },
+  {
+    id: "accounts",
+    title: "3. User Registration & Security",
+    icon: UserCheck,
+    content: `To access most features of MeetOnMemory, you must create a user account. 
+
+A. Account Creation:
+You agree to provide current, complete, and accurate registration information. You are solely responsible for maintaining the confidentiality of your account password and authentication tokens.
+
+B. Responsibility for Workspace Actions:
+If you create an Organization, you are designated as the Owner or Administrator. You are responsible for all actions taken by members you invite to your workspace. Any breach of security or unauthorized access to your account must be reported to support@meetonmemory.com immediately.
+
+C. Account Integrity:
+You may not select a username or organization name that impersonates another person, violates a third party's trademark rights, or is intentionally offensive. We reserve the right to reclaim or change usernames or organization slugs that violate these guidelines.`,
+  },
+  {
+    id: "acceptableUse",
+    title: "4. Acceptable Use Policy",
+    icon: ShieldAlert,
+    content: `You agree to use MeetOnMemory only for lawful purposes. You are strictly prohibited from:
+
+- Non-Consensual Recording: Uploading or transcribing meetings, audio recordings, or video sessions without the express, legally required consent of all participating speakers.
+- System Overload: Attempting to bypass rate limits, trigger excessive AI processing calls, or engage in denial-of-service activities.
+- Unauthorized Harvesting: Scoping, scraping, or systematically collecting user profile data, transcripts, or organization directories.
+- Security Circumvention: Trying to probe, scan, or test the vulnerability of our API endpoints, MongoDB databases, or Pinecone vector nodes.
+- Malware Transmission: Uploading files containing viruses, Trojan horses, ransomware, or malicious script sequences.
+- Illegal Content: Storing or processing content that promotes hate speech, violence, discrimination, or infringes on patent, trademark, or copyright laws.`,
+  },
+  {
+    id: "billingCredits",
+    title: "5. Subscription & AI Credits",
+    icon: CreditCard,
+    content: `Some features of MeetOnMemory require active subscriptions or purchase of AI transcription credits.
+
+A. Billing:
+By selecting a paid subscription tier or purchasing credit bundles, you authorize us to charge the designated payment method for all recurring charges, fees, and applicable taxes. All transactions are processed through secure third-party payment gateways.
+
+B. Credits Balance:
+AI Credits correspond to processed audio minutes. Minutes are deducted from your balance based on the length of the uploaded media file. Credit balances are non-refundable and do not hold cash value.
+
+C. Cancellation:
+You can cancel your subscription at any time through the dashboard settings. Your access to paid features will remain active until the end of the current billing cycle. No partial refunds are issued for unused billing intervals.`,
+  },
+  {
+    id: "intellectualProperty",
+    title: "6. Intellectual Property Rights",
+    icon: Award,
+    content: `A. Your Content:
+You retain all ownership, copyright, and proprietary rights in the raw audio recordings, video files, text transcripts, and documents that you upload to MeetOnMemory (collectively, "User Content"). By uploading User Content, you grant us a limited, global, non-exclusive license to process, partition, vectorize, and summarize the content solely for the purpose of delivering the Service to you and your authorized organization members.
+
+B. AI-Generated Outputs:
+MeetOnMemory claims no ownership over the AI summaries, action items, meeting minutes, or compliance reports generated from your transcripts. They are deemed derivative works of your User Content.
+
+C. Platform IP:
+The Service's interface design, codebase, logos, structural database schemas, vector indexing algorithms, and documentation are the exclusive property of MeetOnMemory and are protected by international copyright and intellectual property laws. You may not copy, reverse-engineer, or adapt any part of our platform.`,
+  },
+  {
+    id: "aiLimits",
+    title: "7. API Usage & AI Limits",
+    icon: Server,
+    content: `Our service relies on third-party APIs (such as Google Gemini APIs) and cloud databases (like Pinecone and MongoDB Atlas).
+
+A. API Boundaries:
+To ensure stable performance for all organizations, we enforce rate limits on AI queries, semantic search operations, document uploads, and real-time collaborative edits.
+
+B. Model Limitations:
+AI models compile text based on probabilistic patterns. You acknowledge that AI-generated summaries, meeting minutes, and compliance audits may occasionally contain inaccuracies, omissions, or misinterpretations ("hallucinations"). You are responsible for reviewing and validating the accuracy of all AI-generated outputs before relying on them for business decisions.`,
+  },
+  {
+    id: "liabilityLimit",
+    title: "8. Limitation of Liability",
+    icon: AlertTriangle,
+    content: `To the maximum extent permitted by applicable law, in no event shall MeetOnMemory, its directors, employees, partners, or API suppliers be liable for:
+
+- Any indirect, incidental, special, consequential, or punitive damages, including loss of profits, data corruption, business interruption, or loss of goodwill.
+- Damages resulting from your access to or inability to access the Service.
+- Unauthorized access, use, or alteration of your transcripts, MongoDB documents, or Pinecone vector indices.
+- Any errors, hallucinations, or inaccuracies in the AI-generated summaries, transcripts, or compliance scores.
+- Any loss or deletion of files, recordings, or organizational data.
+
+Our cumulative liability for all claims arising out of or relating to these Terms or the use of the Service shall not exceed the total amount paid by you to MeetOnMemory in the twelve (12) months preceding the event giving rise to the claim.`,
+  },
+  {
+    id: "indemnification",
+    title: "9. Indemnification",
+    icon: Scale,
+    content: `You agree to defend, indemnify, and hold harmless MeetOnMemory, its contractors, licensors, and their respective directors, officers, employees, and agents from and against any and all claims, damages, obligations, losses, liabilities, costs, or debt, and expenses (including legal fees) arising from:
+
+- Your use of and access to the Service.
+- Any violation of these Terms, including the Acceptable Use Policy.
+- Any claim that your User Content (recordings, transcripts, policies) infringes the intellectual property rights or privacy rights of a third party.
+- Your failure to obtain legally required consent from all participants before recording or transcribing a meeting.`,
+  },
+  {
+    id: "disclaimers",
+    title: "10. Disclaimers of Warranties",
+    icon: Globe,
+    content: `Your use of the Service is at your sole risk. The Service is provided on an "AS IS" and "AS AVAILABLE" basis. MeetOnMemory expressly disclaims all warranties of any kind, whether express or implied, including, but not limited to, the implied warranties of merchantability, fitness for a particular purpose, non-infringement, and course of performance.
+
+We do not warrant that:
+- The Service will function uninterrupted, secure, or available at any specific time or location.
+- Any errors or bugs in the software will be corrected immediately.
+- The Service, including transcription algorithms and vector databases, is free of viruses or other harmful components.
+- The AI-generated summaries, transcripts, and meeting analysis will meet your business requirements or achieve absolute accuracy.`,
+  },
+  {
+    id: "termination",
+    title: "11. Termination of Service",
+    icon: ShieldAlert,
+    content: `We may terminate or suspend your account, access to the Service, or delete your organization workspaces immediately, without prior notice or liability, under our sole discretion, for any reason, including but not limited to:
+
+- A breach of any provision of these Terms (such as non-consensual recording or API abuse).
+- Failure to pay subscription fees.
+- Requests by law enforcement or government agencies.
+- Technical or security issues.
+
+Upon termination, your right to use the Service will immediately cease. If you wish to delete your account, you can do so through the account settings. All provisions of these Terms which by their nature should survive termination shall survive, including ownership provisions, warranty disclaimers, indemnity, and limitations of liability.`,
+  },
+  {
+    id: "governingLaw",
+    title: "12. Governing Law & Arbitration",
+    icon: Scale,
+    content: `These Terms shall be governed by and construed in accordance with the laws of the State of California, United States, without regard to its conflict of law provisions.
+
+Any dispute, controversy, or claim arising out of or relating to these Terms, including the formation, validity, binding effect, interpretation, performance, breach, or termination thereof, shall be resolved by binding arbitration administered by the American Arbitration Association (AAA) in accordance with its Commercial Arbitration Rules. 
+
+The arbitration shall take place in San Francisco, California, and the language of arbitration shall be English. The arbitrator's award shall be final and binding, and judgment on the award may be entered in any court having jurisdiction thereof.`,
+  },
+  {
+    id: "severability",
+    title: "13. Severability & Entire Agreement",
+    icon: FileText,
+    content: `These Terms, along with our Privacy Policy and any subscription agreements, constitute the entire agreement between you and MeetOnMemory regarding your use of the Service, superseding any prior agreements or understandings.
+
+If any provision of these Terms is found to be unenforceable or invalid by an arbitrator or court of competent jurisdiction, that provision shall be limited or eliminated to the minimum extent necessary, and the remaining provisions of these Terms shall remain in full force and effect.
+
+Our failure to enforce any right or provision of these Terms will not be considered a waiver of those rights.`,
+  },
+  {
+    id: "changes",
+    title: "14. Changes to Terms",
+    icon: RefreshCw,
+    content: `We reserve the right, at our sole discretion, to modify or replace these Terms at any time. 
+
+If a revision is material, we will provide at least 30 days' notice prior to any new terms taking effect. Notice may be delivered via email, posted on our landing page, or displayed within your dashboard workspace.
+
+What constitutes a material change will be determined at our sole discretion. By continuing to access or use our Service after those revisions become effective, you agree to be bound by the revised terms. If you do not agree to the new terms, please stop using the Service.`,
+  },
+];
 
 const Terms = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -38,200 +216,7 @@ const Terms = () => {
   const [signatureDate, setSignatureDate] = useState("");
 
   // References for scroll detection
-  const sectionRefs = {
-    agreement: useRef(null),
-    serviceDesc: useRef(null),
-    accounts: useRef(null),
-    acceptableUse: useRef(null),
-    billingCredits: useRef(null),
-    intellectualProperty: useRef(null),
-    aiLimits: useRef(null),
-    liabilityLimit: useRef(null),
-    indemnification: useRef(null),
-    disclaimers: useRef(null),
-    termination: useRef(null),
-    governingLaw: useRef(null),
-    severability: useRef(null),
-    changes: useRef(null),
-  };
-
-  // Sections data
-  const sections = [
-    {
-      id: "agreement",
-      title: "1. Agreement & Eligibility",
-      icon: BookOpen,
-      content: `These Terms of Service ("Terms") constitute a legally binding agreement made between you, whether personally or on behalf of an entity ("you") and MeetOnMemory ("we", "us", or "our"), concerning your access to and use of the MeetOnMemory web application and associated services (the "Service").
-
-By accessing or using the Service, you acknowledge that you have read, understood, and agree to be bound by all of these Terms. If you do not agree with all of these Terms, you are explicitly prohibited from using the Service and must discontinue use immediately.
-
-Eligibility:
-To register for an account and use the Service, you must be at least 16 years of age (or the minimum legal age in your jurisdiction to consent to the processing of personal data). By creating an account, you warrant that you possess the legal capacity to enter into a binding contract and that all registration information you submit is accurate and truthful.`,
-    },
-    {
-      id: "serviceDesc",
-      title: "2. Service Description",
-      icon: Cpu,
-      content: `MeetOnMemory provides an AI-powered workspace platform that processes meeting records, media files, and transcripts. 
-
-Core features include:
-- Transcription Services: Converting voice recordings and video files into text transcripts.
-- AI Summarization: Generating Minutes of Meeting (MoM), summary reports, decision logs, and action items using machine learning models.
-- Semantic Search: Vectorizing document segments (transcripts and uploaded policies) to permit natural language queries.
-- Collaborative Workspaces: Setting up team organizations, browsing profiles, and sharing institutional knowledge.
-
-We reserve the right to modify, suspend, or discontinue any aspect of the Service at any time, with or without notice. We are not liable to you or any third party for any changes, pricing updates, or suspension of the Service.`,
-    },
-    {
-      id: "accounts",
-      title: "3. User Registration & Security",
-      icon: UserCheck,
-      content: `To access most features of MeetOnMemory, you must create a user account. 
-
-A. Account Creation:
-You agree to provide current, complete, and accurate registration information. You are solely responsible for maintaining the confidentiality of your account password and authentication tokens.
-
-B. Responsibility for Workspace Actions:
-If you create an Organization, you are designated as the Owner or Administrator. You are responsible for all actions taken by members you invite to your workspace. Any breach of security or unauthorized access to your account must be reported to support@meetonmemory.com immediately.
-
-C. Account Integrity:
-You may not select a username or organization name that impersonates another person, violates a third party's trademark rights, or is intentionally offensive. We reserve the right to reclaim or change usernames or organization slugs that violate these guidelines.`,
-    },
-    {
-      id: "acceptableUse",
-      title: "4. Acceptable Use Policy",
-      icon: ShieldAlert,
-      content: `You agree to use MeetOnMemory only for lawful purposes. You are strictly prohibited from:
-
-- Non-Consensual Recording: Uploading or transcribing meetings, audio recordings, or video sessions without the express, legally required consent of all participating speakers.
-- System Overload: Attempting to bypass rate limits, trigger excessive AI processing calls, or engage in denial-of-service activities.
-- Unauthorized Harvesting: Scoping, scraping, or systematically collecting user profile data, transcripts, or organization directories.
-- Security Circumvention: Trying to probe, scan, or test the vulnerability of our API endpoints, MongoDB databases, or Pinecone vector nodes.
-- Malware Transmission: Uploading files containing viruses, Trojan horses, ransomware, or malicious script sequences.
-- Illegal Content: Storing or processing content that promotes hate speech, violence, discrimination, or infringes on patent, trademark, or copyright laws.`,
-    },
-    {
-      id: "billingCredits",
-      title: "5. Subscription & AI Credits",
-      icon: CreditCard,
-      content: `Some features of MeetOnMemory require active subscriptions or purchase of AI transcription credits.
-
-A. Billing:
-By selecting a paid subscription tier or purchasing credit bundles, you authorize us to charge the designated payment method for all recurring charges, fees, and applicable taxes. All transactions are processed through secure third-party payment gateways.
-
-B. Credits Balance:
-AI Credits correspond to processed audio minutes. Minutes are deducted from your balance based on the length of the uploaded media file. Credit balances are non-refundable and do not hold cash value.
-
-C. Cancellation:
-You can cancel your subscription at any time through the dashboard settings. Your access to paid features will remain active until the end of the current billing cycle. No partial refunds are issued for unused billing intervals.`,
-    },
-    {
-      id: "intellectualProperty",
-      title: "6. Intellectual Property Rights",
-      icon: Award,
-      content: `A. Your Content:
-You retain all ownership, copyright, and proprietary rights in the raw audio recordings, video files, text transcripts, and documents that you upload to MeetOnMemory (collectively, "User Content"). By uploading User Content, you grant us a limited, global, non-exclusive license to process, partition, vectorize, and summarize the content solely for the purpose of delivering the Service to you and your authorized organization members.
-
-B. AI-Generated Outputs:
-MeetOnMemory claims no ownership over the AI summaries, action items, meeting minutes, or compliance reports generated from your transcripts. They are deemed derivative works of your User Content.
-
-C. Platform IP:
-The Service's interface design, codebase, logos, structural database schemas, vector indexing algorithms, and documentation are the exclusive property of MeetOnMemory and are protected by international copyright and intellectual property laws. You may not copy, reverse-engineer, or adapt any part of our platform.`,
-    },
-    {
-      id: "aiLimits",
-      title: "7. API Usage & AI Limits",
-      icon: Server,
-      content: `Our service relies on third-party APIs (such as Google Gemini APIs) and cloud databases (like Pinecone and MongoDB Atlas).
-
-A. API Boundaries:
-To ensure stable performance for all organizations, we enforce rate limits on AI queries, semantic search operations, document uploads, and real-time collaborative edits.
-
-B. Model Limitations:
-AI models compile text based on probabilistic patterns. You acknowledge that AI-generated summaries, meeting minutes, and compliance audits may occasionally contain inaccuracies, omissions, or misinterpretations ("hallucinations"). You are responsible for reviewing and validating the accuracy of all AI-generated outputs before relying on them for business decisions.`,
-    },
-    {
-      id: "liabilityLimit",
-      title: "8. Limitation of Liability",
-      icon: AlertTriangle,
-      content: `To the maximum extent permitted by applicable law, in no event shall MeetOnMemory, its directors, employees, partners, or API suppliers be liable for:
-
-- Any indirect, incidental, special, consequential, or punitive damages, including loss of profits, data corruption, business interruption, or loss of goodwill.
-- Damages resulting from your access to or inability to access the Service.
-- Unauthorized access, use, or alteration of your transcripts, MongoDB documents, or Pinecone vector indices.
-- Any errors, hallucinations, or inaccuracies in the AI-generated summaries, transcripts, or compliance scores.
-- Any loss or deletion of files, recordings, or organizational data.
-
-Our cumulative liability for all claims arising out of or relating to these Terms or the use of the Service shall not exceed the total amount paid by you to MeetOnMemory in the twelve (12) months preceding the event giving rise to the claim.`,
-    },
-    {
-      id: "indemnification",
-      title: "9. Indemnification",
-      icon: Scale,
-      content: `You agree to defend, indemnify, and hold harmless MeetOnMemory, its contractors, licensors, and their respective directors, officers, employees, and agents from and against any and all claims, damages, obligations, losses, liabilities, costs, or debt, and expenses (including legal fees) arising from:
-
-- Your use of and access to the Service.
-- Any violation of these Terms, including the Acceptable Use Policy.
-- Any claim that your User Content (recordings, transcripts, policies) infringes the intellectual property rights or privacy rights of a third party.
-- Your failure to obtain legally required consent from all participants before recording or transcribing a meeting.`,
-    },
-    {
-      id: "disclaimers",
-      title: "10. Disclaimers of Warranties",
-      icon: Globe,
-      content: `Your use of the Service is at your sole risk. The Service is provided on an "AS IS" and "AS AVAILABLE" basis. MeetOnMemory expressly disclaims all warranties of any kind, whether express or implied, including, but not limited to, the implied warranties of merchantability, fitness for a particular purpose, non-infringement, and course of performance.
-
-We do not warrant that:
-- The Service will function uninterrupted, secure, or available at any specific time or location.
-- Any errors or bugs in the software will be corrected immediately.
-- The Service, including transcription algorithms and vector databases, is free of viruses or other harmful components.
-- The AI-generated summaries, transcripts, and meeting analysis will meet your business requirements or achieve absolute accuracy.`,
-    },
-    {
-      id: "termination",
-      title: "11. Termination of Service",
-      icon: ShieldAlert,
-      content: `We may terminate or suspend your account, access to the Service, or delete your organization workspaces immediately, without prior notice or liability, under our sole discretion, for any reason, including but not limited to:
-
-- A breach of any provision of these Terms (such as non-consensual recording or API abuse).
-- Failure to pay subscription fees.
-- Requests by law enforcement or government agencies.
-- Technical or security issues.
-
-Upon termination, your right to use the Service will immediately cease. If you wish to delete your account, you can do so through the account settings. All provisions of these Terms which by their nature should survive termination shall survive, including ownership provisions, warranty disclaimers, indemnity, and limitations of liability.`,
-    },
-    {
-      id: "governingLaw",
-      title: "12. Governing Law & Arbitration",
-      icon: Scale,
-      content: `These Terms shall be governed by and construed in accordance with the laws of the State of California, United States, without regard to its conflict of law provisions.
-
-Any dispute, controversy, or claim arising out of or relating to these Terms, including the formation, validity, binding effect, interpretation, performance, breach, or termination thereof, shall be resolved by binding arbitration administered by the American Arbitration Association (AAA) in accordance with its Commercial Arbitration Rules. 
-
-The arbitration shall take place in San Francisco, California, and the language of arbitration shall be English. The arbitrator's award shall be final and binding, and judgment on the award may be entered in any court having jurisdiction thereof.`,
-    },
-    {
-      id: "severability",
-      title: "13. Severability & Entire Agreement",
-      icon: FileText,
-      content: `These Terms, along with our Privacy Policy and any subscription agreements, constitute the entire agreement between you and MeetOnMemory regarding your use of the Service, superseding any prior agreements or understandings.
-
-If any provision of these Terms is found to be unenforceable or invalid by an arbitrator or court of competent jurisdiction, that provision shall be limited or eliminated to the minimum extent necessary, and the remaining provisions of these Terms shall remain in full force and effect.
-
-Our failure to enforce any right or provision of these Terms will not be considered a waiver of those rights.`,
-    },
-    {
-      id: "changes",
-      title: "14. Changes to Terms",
-      icon: RefreshCw,
-      content: `We reserve the right, at our sole discretion, to modify or replace these Terms at any time. 
-
-If a revision is material, we will provide at least 30 days' notice prior to any new terms taking effect. Notice may be delivered via email, posted on our landing page, or displayed within your dashboard workspace.
-
-What constitutes a material change will be determined at our sole discretion. By continuing to access or use our Service after those revisions become effective, you agree to be bound by the revised terms. If you do not agree to the new terms, please stop using the Service.`,
-    },
-  ];
-
+  const sectionRefs = useRef({});
   // FAQ Accordion Data
   const faqs = [
     {
@@ -259,7 +244,7 @@ What constitutes a material change will be determined at our sole discretion. By
 
       for (let i = 0; i < sections.length; i++) {
         const sectionId = sections[i].id;
-        const element = sectionRefs[sectionId].current;
+        const element = sectionRefs.current[sectionId];
         if (element) {
           const top = element.offsetTop;
           const height = element.offsetHeight;
@@ -273,11 +258,11 @@ What constitutes a material change will be determined at our sole discretion. By
 
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [sections]);
+  }, []);
 
   // Handle sidebar link clicks with smooth offset scroll
   const scrollToSection = (id) => {
-    const element = sectionRefs[id].current;
+    const element = sectionRefs.current[id];
     if (element) {
       window.scrollTo({
         top: element.offsetTop - 100,
@@ -296,7 +281,7 @@ What constitutes a material change will be determined at our sole discretion. By
         sec.title.toLowerCase().includes(query) ||
         sec.content.toLowerCase().includes(query)
     );
-  }, [searchQuery, sections]);
+  }, [searchQuery]);
 
   // Signature Simulator Submit Handler
   const handleSignatureSubmit = (e) => {
@@ -455,7 +440,9 @@ What constitutes a material change will be determined at our sole discretion. By
                   return (
                     <article
                       key={sec.id}
-                      ref={sectionRefs[sec.id]}
+                      ref={(el) => {
+                        sectionRefs.current[sec.id] = el;
+                      }}
                       className="scroll-mt-24 border-b border-gray-100 last:border-0 dark:border-slate-700/60 pb-8 last:pb-0"
                     >
                       <div className="flex items-center gap-3 mb-4">

@@ -20,6 +20,7 @@ import {
   Loader2,
   ChevronDown,
   ExternalLink,
+  GitMerge,
 } from "lucide-react";
 
 /**
@@ -258,13 +259,22 @@ const Tasks = () => {
 
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-16">
         {/* Header */}
-        <div className="mb-8 fade-in-up">
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
-            Tasks & Action Items
-          </h1>
-          <p className="text-slate-600 dark:text-slate-400">
-            Track and manage action items from your meeting summaries
-          </p>
+        <div className="mb-8 fade-in-up flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+              Tasks & Action Items
+            </h1>
+            <p className="text-slate-600 dark:text-slate-400">
+              Track and manage action items from your meeting summaries
+            </p>
+          </div>
+          <button
+            onClick={() => navigate("/knowledge/consolidate")}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
+            <GitMerge className="w-4 h-4" />
+            Consolidate memories
+          </button>
         </div>
 
         {/* Search and Filters */}

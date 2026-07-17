@@ -85,6 +85,9 @@ export const PERMISSIONS = {
     create: ["owner", "admin", "moderator", "member"],
     edit: ["owner", "admin", "moderator", "member"],
     delete: ["owner", "admin", "moderator"],
+    // Merging/consolidating memories mutates the graph in bulk, so it's
+    // restricted like other structural knowledge-base changes.
+    consolidate: ["owner", "admin", "moderator"],
   },
   // Notifications permissions
   notifications: {

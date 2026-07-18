@@ -43,6 +43,7 @@
     "onnxruntime-web": "^1.23.0",
     "openai": "^6.8.1",
     "pdf-parse": "^2.4.5",
+    "rate-limit-redis": "^4.2.0",
     "pdfkit": "^0.19.1",
     "pptx2json": "^0.0.10",
     "redis": "^6.1.0",

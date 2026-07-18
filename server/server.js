@@ -9,7 +9,6 @@ import connectDB from "./config/mongodb.js";
 
 import authRoutes from "./routes/authRoutes.js";
 import organizationRoutes from "./routes/organizationRoutes.js";
-import organizationRoutesNew from "./routes/organizationRoutesNew.js";
 import membershipRoutes from "./routes/membershipRoutes.js";
 import membershipRequestRoutes from "./routes/membershipRequestRoutes.js";
 import invitationRoutes from "./routes/invitationRoutes.js";
@@ -26,6 +25,7 @@ import policyComplianceRoutes from "./routes/policyComplianceRoutes.js";
 import sessionRoutes from "./routes/sessionRoutes.js";
 import webhookRoutes from "./routes/webhookRoutes.js";
 import slackRoutes from "./routes/slackRoutes.js";
+import transcriptRoutes from "./routes/transcriptRoutes.js";
 
 // Import slackService to register its eventBus 'mom.generated' listener.
 // The import itself is enough — the listener is set up at module load time.
@@ -83,7 +83,6 @@ app.get("/api/csrf-token", csrfTokenProvider, (req, res) => {
 // ROUTES
 app.use("/api/auth", authRoutes);
 app.use(["/api/organization", "/api/organizations"], organizationRoutes);
-app.use(["/api/organization/new", "/api/organizations/new"], organizationRoutesNew);
 app.use("/api/membership", membershipRoutes);
 app.use("/api/membership-request", membershipRequestRoutes);
 app.use("/api/invitation", invitationRoutes);
@@ -102,6 +101,7 @@ import { slackWebhookParser } from "./middleware/slackWebhookParser.js";
 app.use("/api/sessions", sessionRoutes);
 app.use("/api/webhooks", webhookRoutes);
 app.use("/api/slack", slackWebhookParser, slackRoutes);
+app.use("/api/transcripts", transcriptRoutes);
 
 // Health check endpoint — registered BEFORE the global rate limiter so
 // keep-alive pings (e.g. from GitHub Actions cron job) are never blocked.

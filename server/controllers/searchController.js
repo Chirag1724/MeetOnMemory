@@ -6,6 +6,7 @@
 import { searchVectorStore } from "../utils/embeddingUtils.js";
 import Meeting from "../models/meetingModel.js";
 import { getRedisClient } from "../services/redisService.js";
+import { buildExplanation } from "../utils/explanationBuilder.js";
 
 /**
  * @desc  Search meetings using AI embeddings
@@ -55,7 +56,7 @@ export const semanticSearch = async (req, res) => {
 
     // ✅ Step 5 — Merge vector results with DB data and filter out deleted meetings
     const mergedResults = results
-      .map((r) => {
+      .map((r, index) => {
         const m = meetings.find((mt) => mt._id.toString() === r.meetingId);
         // Defense in depth: only return results that still exist in MongoDB
         if (!m) return null;
@@ -65,6 +66,15 @@ export const semanticSearch = async (req, res) => {
           summary: m?.summary || r.summary || "No summary available.",
           score: (1 - r.similarityScore).toFixed(3),
           createdAt: m?.createdAt || null,
+          // FEATURE #270: human-readable explanation of why this result was
+          // returned. Meetings don't carry graph/access-history data today
+          // (see server/graph/graphIndex.js), so those fields are honestly
+          // reported as not applicable rather than faked.
+          explanation: buildExplanation({
+            type: "meeting",
+            semanticScore: r.similarityScore || 0,
+            vectorRank: index + 1,
+          }),
         };
       })
       .filter((r) => r !== null);

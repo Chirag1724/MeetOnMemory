@@ -1,4 +1,17 @@
 import rateLimit from "express-rate-limit";
+import { RedisStore } from "rate-limit-redis";
+import { getRedisClient } from "../services/redisService.js";
+
+// Create a shared store that uses Redis if available, otherwise falls back to in-memory
+const createStore = () => {
+  const redisClient = getRedisClient();
+  if (redisClient) {
+    return new RedisStore({
+      sendCommand: (...args) => redisClient.sendCommand(...args),
+    });
+  }
+  return undefined; // Falls back to default MemoryStore
+};
 
 // General rate limiter for API routes
 export const apiLimiter = rateLimit({
@@ -10,6 +23,7 @@ export const apiLimiter = rateLimit({
   },
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  store: createStore(),
 });
 
 // Stricter rate limiter for write operations (create, update, delete)
@@ -22,6 +36,7 @@ export const writeLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  store: createStore(),
 });
 
 // Rate limiter for file uploads (stricter due to resource usage)
@@ -34,6 +49,7 @@ export const uploadLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  store: createStore(),
 });
 
 // ================================
@@ -51,6 +67,7 @@ export const loginLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true, // Don't count successful requests
+  store: createStore(),
 });
 
 // Rate limiter for registration endpoint (protects against automated account creation)
@@ -65,6 +82,7 @@ export const registerLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true,
+  store: createStore(),
 });
 
 // Rate limiter for OTP endpoints (protects against OTP abuse and spam)
@@ -78,6 +96,7 @@ export const otpLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true,
+  store: createStore(),
 });
 
 // ================================
@@ -95,6 +114,7 @@ export const globalLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  store: createStore(),
 });
 
 // Rate limiter for data export requests (1 per 24 hours per IP)
@@ -107,4 +127,5 @@ export const dataExportLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  store: createStore(),
 });

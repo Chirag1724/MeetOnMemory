@@ -32,6 +32,7 @@ import Reports from "./pages/Reports.jsx";
 import AiSearch from "./pages/AiSearch.jsx";
 import MeetingRoom from "./pages/MeetingRoom.jsx";
 import MeetingDetails from "./pages/MeetingDetails.jsx";
+import TranscriptViewer from "./pages/TranscriptViewer.jsx";
 import TeamMembers from "./pages/TeamMembers.jsx";
 import Profile from "./pages/Profile.jsx";
 import Calendar from "./pages/Calendar.jsx";
@@ -42,6 +43,8 @@ import MemoryConsolidation from "./pages/MemoryConsolidation.jsx";
 import PolicyCompliance from "./pages/PolicyCompliance.jsx";
 import Settings from "./pages/Settings.jsx";
 import MembershipRequests from "./pages/MembershipRequests.jsx";
+import AdminPanel from "./pages/AdminPanel.jsx";
+import AccessDenied from "./pages/AccessDenied.jsx";
 import Navbar from "./components/Navbar";
 import ScrollNavigator from "./components/ScrollNavigator";
 
@@ -291,6 +294,14 @@ const App = () => {
           />
           <Route path="/meeting-room/:roomId" element={<MeetingRoom />} />
           <Route
+            path="/transcript/:meetingId"
+            element={
+              <ProtectedRoute resource="meetings" action="view">
+                <TranscriptViewer />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/meeting/:id"
             element={
               <ProtectedRoute resource="meetings" action="view">
@@ -359,6 +370,19 @@ const App = () => {
             element={
               <ProtectedRoute resource="team_members" action="invite">
                 <MembershipRequests />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin-panel"
+            element={
+              <ProtectedRoute
+                resource="admin_panel"
+                action="view"
+                forbiddenFallback={<AccessDenied />}
+              >
+                <AdminPanel />
               </ProtectedRoute>
             }
           />

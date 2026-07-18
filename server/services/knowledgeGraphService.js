@@ -185,7 +185,8 @@ export async function processStructuredMoM(meeting, mom) {
 }
 
 /**
- * Returns the chronological chain of decisions related to a given decision ID.
+ * Returns the chronological chain of decisions related to a given decision ID,
+ * following relatesTo edges whose confidence clears CONFIDENCE_THRESHOLD.
  */
 export async function getDecisionLineage(decisionId) {
   const visited = new Set();

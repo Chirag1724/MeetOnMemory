@@ -11,11 +11,15 @@
 import fs from "fs";
 import mongoose from "mongoose";
 import User from "../models/userModel.js";
-import { indexMeeting, deleteMeetingFromPinecone } from "../utils/embeddingUtils.js";
+import {
+  indexMeeting,
+  deleteMeetingFromPinecone,
+} from "../utils/embeddingUtils.js";
 import {
   processStructuredMoM,
   detectResolutions,
 } from "./knowledgeGraphService.js";
+import { captureSnapshot } from "./graphSnapshotService.js";
 import { checkMeetingDecisionsAgainstPolicies } from "./policyComplianceService.js";
 import { createAndPushNotification } from "./notificationService.js";
 import eventBus from "./eventBus.js";
@@ -30,7 +34,11 @@ import {
 // Imported specific services and utils
 import { validatePath } from "../utils/fileUtils.js";
 import { transcribeFile, transcribeAudioUrl } from "./TranscriptionService.js";
-import { generateMoMWithAI, normalizeMoM, buildHumanReadableMoM } from "./GenerativeAIService.js";
+import {
+  generateMoMWithAI,
+  normalizeMoM,
+  buildHumanReadableMoM,
+} from "./GenerativeAIService.js";
 import * as MeetingStorageService from "./MeetingStorageService.js";
 
 export const isValidObjectId = (id) =>
@@ -55,6 +63,22 @@ const _runKnowledgeGraph = (meetingDoc, mom) => {
         console.error(
           "⚠️ Policy compliance check failed (non-fatal):",
           complianceErr.message,
+        );
+      }
+
+      // Automatic graph snapshot: capture the post-processing graph state
+      // so this meeting's contribution to the knowledge graph is visible
+      // in the history/time-travel view. No-ops (storage-wise) if nothing
+      // actually changed the graph.
+      try {
+        await captureSnapshot(meetingDoc.organization || null, {
+          trigger: "meeting_processed",
+          sourceMeetingId: meetingDoc._id,
+        });
+      } catch (snapshotErr) {
+        console.error(
+          "⚠️ Graph snapshot capture failed (non-fatal):",
+          snapshotErr.message,
         );
       }
     } catch (kgErr) {
@@ -374,7 +398,11 @@ export const updateMeeting = async (userId, meetingId, data, doc = null) => {
   }
 
   const meeting =
-    doc || (await MeetingStorageService.findMeetingByQuery({ _id: meetingId, uploadedBy: userId }));
+    doc ||
+    (await MeetingStorageService.findMeetingByQuery({
+      _id: meetingId,
+      uploadedBy: userId,
+    }));
   if (!meeting) throw new NotFoundError("Meeting not found");
 
   const {
@@ -487,7 +515,8 @@ export const searchMeetings = async ({ query, audioUrl }) => {
   }
 
   console.log(`🔍 Searching meetings for: "${searchQuery}"`);
-  const results = await MeetingStorageService.searchMeetingsRecords(searchQuery);
+  const results =
+    await MeetingStorageService.searchMeetingsRecords(searchQuery);
 
   return { query: searchQuery, count: results.length, results };
 };

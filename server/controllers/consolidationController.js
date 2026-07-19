@@ -4,6 +4,7 @@ import {
   getConsolidatedMemories,
   MODEL_REGISTRY,
 } from "../services/memoryConsolidationService.js";
+import { captureSnapshot } from "../services/graphSnapshotService.js";
 
 const VALID_MODEL_TYPES = Object.keys(MODEL_REGISTRY);
 
@@ -89,6 +90,18 @@ export const runConsolidation = async (req, res) => {
           totalMerged: report.totalMerged,
         },
       });
+
+      try {
+        await captureSnapshot(organization, {
+          trigger: "consolidation",
+          triggeredBy: req.user._id,
+        });
+      } catch (snapshotErr) {
+        console.error(
+          "⚠️ Graph snapshot capture failed (non-fatal):",
+          snapshotErr.message,
+        );
+      }
     }
 
     res.status(200).json({

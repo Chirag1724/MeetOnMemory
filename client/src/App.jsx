@@ -40,6 +40,7 @@ import Notifications from "./pages/Notifications.jsx";
 import Tasks from "./pages/Tasks.jsx";
 import KnowledgeTimeline from "./pages/KnowledgeTimeline.jsx";
 import MemoryConsolidation from "./pages/MemoryConsolidation.jsx";
+import GraphSnapshots from "./pages/GraphSnapshots.jsx";
 import PolicyCompliance from "./pages/PolicyCompliance.jsx";
 import Settings from "./pages/Settings.jsx";
 import MembershipRequests from "./pages/MembershipRequests.jsx";
@@ -199,6 +200,14 @@ const App = () => {
             element={
               <ProtectedRoute resource="knowledge" action="view">
                 <MemoryConsolidation />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/knowledge/graph-history"
+            element={
+              <ProtectedRoute resource="knowledge" action="view">
+                <GraphSnapshots />
               </ProtectedRoute>
             }
           />

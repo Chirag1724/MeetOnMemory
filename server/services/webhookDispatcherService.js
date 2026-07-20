@@ -117,6 +117,16 @@ export const performDispatch = async (webhookId, payload, options = {}) => {
       timeout: 10000, // 10 second timeout
     });
 
+    const sanitizeHeaders = (headers) => {
+      if (!headers || typeof headers !== "object") return null;
+      const sanitized = { ...headers };
+      delete sanitized["set-cookie"];
+      delete sanitized["authorization"];
+      delete sanitized["cookie"];
+      delete sanitized["x-auth-token"];
+      return sanitized;
+    };
+
     const executionTimeMs = Date.now() - startTime;
 
     // Log successful delivery attempt
@@ -126,7 +136,7 @@ export const performDispatch = async (webhookId, payload, options = {}) => {
       event: payload.event || "custom",
       payload,
       responseStatus: response.status,
-      responseHeaders: response.headers,
+      responseHeaders: sanitizeHeaders(response.headers),
       responseBody:
         typeof response.data === "string"
           ? response.data.slice(0, 2000)
@@ -151,7 +161,16 @@ export const performDispatch = async (webhookId, payload, options = {}) => {
   } catch (error) {
     const executionTimeMs = Date.now() - startTime;
     const responseStatus = error.response ? error.response.status : null;
-    const responseHeaders = error.response ? error.response.headers : null;
+    const responseHeaders = error.response
+      ? { ...error.response.headers }
+      : null;
+    if (responseHeaders) {
+      delete responseHeaders["set-cookie"];
+      delete responseHeaders["authorization"];
+      delete responseHeaders["cookie"];
+      delete responseHeaders["x-auth-token"];
+    }
+
     const responseBody = error.response?.data
       ? typeof error.response.data === "string"
         ? error.response.data.slice(0, 2000)
@@ -178,29 +197,41 @@ export const performDispatch = async (webhookId, payload, options = {}) => {
       errorReason: errorMsg,
     });
 
-    // Update consecutive failures and auto-pause circuit breaker logic
-    const newFailures = (webhook.consecutiveFailures || 0) + 1;
-    let newHealthStatus = webhook.healthStatus;
-    let newIsActive = webhook.isActive;
+    // Atomically increment consecutive failures to prevent race conditions across concurrent workers
+    const updatedWebhook = await Webhook.findByIdAndUpdate(
+      webhookId,
+      { $inc: { consecutiveFailures: 1 } },
+      { new: true },
+    );
 
-    if (newFailures >= 15) {
-      newHealthStatus = "paused";
-      newIsActive = false;
-      console.warn(
-        `🚨 Webhook ${webhook._id} (${webhook.targetUrl}) reached 15 consecutive failures. Auto-pausing subscription.`,
-      );
-    } else if (newFailures >= 10) {
-      newHealthStatus = "degraded";
-      console.warn(
-        `⚠️ Webhook ${webhook._id} (${webhook.targetUrl}) health degraded (${newFailures} consecutive failures).`,
-      );
+    if (updatedWebhook) {
+      const newFailures = updatedWebhook.consecutiveFailures;
+      let newHealthStatus = updatedWebhook.healthStatus;
+      let newIsActive = updatedWebhook.isActive;
+
+      if (newFailures >= 15) {
+        newHealthStatus = "paused";
+        newIsActive = false;
+        console.warn(
+          `🚨 Webhook ${updatedWebhook._id} (${updatedWebhook.targetUrl}) reached 15 consecutive failures. Auto-pausing subscription.`,
+        );
+      } else if (newFailures >= 10) {
+        newHealthStatus = "degraded";
+        console.warn(
+          `⚠️ Webhook ${updatedWebhook._id} (${updatedWebhook.targetUrl}) health degraded (${newFailures} consecutive failures).`,
+        );
+      }
+
+      if (
+        newHealthStatus !== updatedWebhook.healthStatus ||
+        newIsActive !== updatedWebhook.isActive
+      ) {
+        await Webhook.findByIdAndUpdate(webhookId, {
+          healthStatus: newHealthStatus,
+          isActive: newIsActive,
+        });
+      }
     }
-
-    await Webhook.findByIdAndUpdate(webhookId, {
-      consecutiveFailures: newFailures,
-      healthStatus: newHealthStatus,
-      isActive: newIsActive,
-    });
 
     console.error(
       `❌ Webhook dispatch failed for ${webhook.targetUrl} (Attempt ${attempt}): ${errorMsg}`,

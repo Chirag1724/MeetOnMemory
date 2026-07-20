@@ -6,13 +6,11 @@ const webhookDeliverySchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Webhook",
       required: true,
-      index: true,
     },
     organizationId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Organization",
       required: true,
-      index: true,
     },
     event: {
       type: String,
@@ -63,6 +61,11 @@ const webhookDeliverySchema = new mongoose.Schema(
 // Composite index for fast pagination of deliveries by webhook
 webhookDeliverySchema.index({ webhookId: 1, createdAt: -1 });
 webhookDeliverySchema.index({ organizationId: 1, createdAt: -1 });
+// TTL index: Automatically purge delivery audit logs older than 30 days
+webhookDeliverySchema.index(
+  { createdAt: 1 },
+  { expireAfterSeconds: 30 * 24 * 60 * 60 },
+);
 
 const WebhookDelivery =
   mongoose.models.WebhookDelivery ||

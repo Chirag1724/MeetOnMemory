@@ -335,17 +335,22 @@ export const deleteWebhook = async (req, res, next) => {
   }
 };
 
+const getDeliveriesQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+  status: z.enum(["success", "failed", "dlq"]).optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+});
+
 /**
  * 🟢 Get delivery audit logs for a specific webhook subscription
- * GET /api/webhooks/:id/deliveries?page=1&limit=20&status=failed
+ * GET /api/webhooks/:id/deliveries?page=1&limit=20&status=failed&startDate=...&endDate=...
  */
 export const getWebhookDeliveries = async (req, res, next) => {
   try {
     const { id } = req.params;
     const userId = getUserId(req);
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = Math.min(100, parseInt(req.query.limit, 10) || 20);
-    const status = req.query.status;
 
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       throw new ValidationError("Valid Webhook ID is required.");
@@ -367,9 +372,28 @@ export const getWebhookDeliveries = async (req, res, next) => {
       );
     }
 
-    const query = { webhookId: id };
-    if (status && ["success", "failed", "dlq"].includes(status)) {
-      query.status = status;
+    const { page, limit, status, startDate, endDate } =
+      getDeliveriesQuerySchema.parse(req.query);
+
+    // Build typed query object avoiding taint flags for static analysis (CodeQL)
+    const cleanWebhookId = new mongoose.Types.ObjectId(id);
+    const query = { webhookId: cleanWebhookId };
+
+    if (status) {
+      query.status = String(status);
+    }
+
+    if (startDate || endDate) {
+      const dateFilter = {};
+      if (startDate && !isNaN(Date.parse(startDate))) {
+        dateFilter.$gte = new Date(startDate);
+      }
+      if (endDate && !isNaN(Date.parse(endDate))) {
+        dateFilter.$lte = new Date(endDate);
+      }
+      if (Object.keys(dateFilter).length > 0) {
+        query.createdAt = dateFilter;
+      }
     }
 
     const total = await WebhookDelivery.countDocuments(query);
@@ -423,6 +447,12 @@ export const redeliverWebhookPayload = async (req, res, next) => {
     }
 
     const newDelivery = await redeliverWebhookDelivery(deliveryId);
+
+    if (!newDelivery) {
+      throw new ValidationError(
+        "Redelivery skipped: the target webhook is inactive or paused.",
+      );
+    }
 
     return res.status(200).json({
       success: true,

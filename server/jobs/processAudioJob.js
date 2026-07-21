@@ -8,6 +8,7 @@ import {
 } from "../services/knowledgeGraphService.js";
 import User from "../models/userModel.js";
 import { createAndPushNotification } from "../services/notificationService.js";
+import { indexMeeting } from "../utils/embeddingUtils.js";
 
 export default async function processAudioJob(job, app) {
   const { meetingId, transcript, date, title, userId } = job.data;

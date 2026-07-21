@@ -35,7 +35,6 @@ import "./services/slackService.js";
 // organization whenever new decisions/action items are extracted.
 import "./services/conflictScanTrigger.js";
 
-import { initVectorStore } from "./utils/embeddingUtils.js";
 import meetingSocket from "./socket/meetingSocket.js";
 import documentSync from "./socket/documentSync.js";
 import { initRedis, getRedisClient } from "./services/redisService.js";
@@ -150,7 +149,6 @@ if (process.env.NODE_ENV !== "test") {
       safeInit("Data Export Worker", () => initDataExportWorker(app));
       safeInit("Conflict Scan Worker", () => initConflictScanWorker(app));
       safeInit("Webhook Worker", () => initWebhookWorker());
-      safeInit("Vector Store", () => initVectorStore());
     });
   });
 }

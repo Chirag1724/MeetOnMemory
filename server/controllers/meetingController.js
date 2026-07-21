@@ -18,7 +18,7 @@ import { z } from "zod";
 import * as MeetingService from "../services/MeetingService.js";
 import { ValidationError, UnauthorizedError } from "../utils/errors.js";
 import AuditService from "../services/AuditService.js";
-import { sendSuccess, sendError } from "../utils/responseHandler.js";
+import { sendSuccess } from "../utils/responseHandler.js";
 // ═══════════════════════════════════════════════════════════════
 // Zod validation schemas
 // ═══════════════════════════════════════════════════════════════
@@ -102,6 +102,10 @@ const getAllMeetingsQuerySchema = z.object({
     }),
   search: z.string().optional(),
   meetingType: z.string().optional(),
+  includeArchived: z
+    .string()
+    .optional()
+    .transform((val) => val === "true"),
 });
 
 // Helper to prevent path traversal in manual file cleanup checks
@@ -437,8 +441,42 @@ export const searchMeetingsByText = async (req, res, next) => {
 };
 
 /* ─────────────────────────────────────────────────────────────
-   10. NOTIFY LIVE MEETING PARTICIPANTS
-   ───────────────────────────────────────────────────────────── */
+    10. ARCHIVE MEETING
+    ───────────────────────────────────────────────────────────── */
+export const archiveMeeting = async (req, res, next) => {
+  try {
+    getUserId(req);
+    const meeting = await MeetingService.archiveMeeting(req.params.id);
+    return res.status(200).json({
+      success: true,
+      message: "Meeting archived successfully",
+      meeting: { _id: meeting._id, archived: meeting.archived },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/* ─────────────────────────────────────────────────────────────
+    11. RESTORE MEETING
+    ───────────────────────────────────────────────────────────── */
+export const restoreMeeting = async (req, res, next) => {
+  try {
+    getUserId(req);
+    const meeting = await MeetingService.restoreMeeting(req.params.id);
+    return res.status(200).json({
+      success: true,
+      message: "Meeting restored successfully",
+      meeting: { _id: meeting._id, archived: meeting.archived },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/* ─────────────────────────────────────────────────────────────
+    12. NOTIFY LIVE MEETING PARTICIPANTS
+    ───────────────────────────────────────────────────────────── */
 export const notifyLiveMeeting = async (req, res, next) => {
   try {
     const uploaderId = getUserId(req);

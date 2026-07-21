@@ -35,10 +35,9 @@ import "./services/slackService.js";
 // organization whenever new decisions/action items are extracted.
 import "./services/conflictScanTrigger.js";
 
-import { initVectorStore } from "./utils/embeddingUtils.js";
 import meetingSocket from "./socket/meetingSocket.js";
 import documentSync from "./socket/documentSync.js";
-import { initRedis, getRedisClient } from "./services/redisService.js";
+import { initRedis } from "./services/redisService.js";
 import { createAdapter } from "@socket.io/redis-adapter";
 import { createClient } from "redis";
 import {
@@ -73,7 +72,10 @@ if (!process.env.JWT_SECRET) {
 await connectDB();
 
 import { corsOptions, allowedOrigins } from "./config/corsOptions.js";
-import { csrfMiddleware, csrfTokenProvider } from "./middleware/csrfProtection.js";
+import {
+  csrfMiddleware,
+  csrfTokenProvider,
+} from "./middleware/csrfProtection.js";
 
 // MIDDLEWARES
 app.use(cors(corsOptions));
@@ -136,12 +138,15 @@ if (process.env.NODE_ENV !== "test") {
   server.listen(PORT, () => {
     console.log(`🚀 MeetOnMemory Server running on port ${PORT}`);
 
-    setImmediate(() => {
+    setTimeout(() => {
       const safeInit = async (name, initFn) => {
         try {
           await initFn();
         } catch (err) {
-          console.error(`⚠️ Failed to initialize background service "${name}":`, err.message || err);
+          console.error(
+            `⚠️ Failed to initialize background service "${name}":`,
+            err.message || err,
+          );
         }
       };
 
@@ -150,7 +155,6 @@ if (process.env.NODE_ENV !== "test") {
       safeInit("Data Export Worker", () => initDataExportWorker(app));
       safeInit("Conflict Scan Worker", () => initConflictScanWorker(app));
       safeInit("Webhook Worker", () => initWebhookWorker());
-      safeInit("Vector Store", () => initVectorStore());
     });
   });
 }

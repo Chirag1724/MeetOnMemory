@@ -59,12 +59,10 @@ export const getOrganizationMemberships = async (req, res) => {
     });
 
     if (!membership) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Not a member of this organization.",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "Not a member of this organization.",
+      });
     }
 
     const memberships = await Membership.find({
@@ -97,12 +95,10 @@ export const updateMembershipRole = async (req, res) => {
     }
 
     if (!role || !["admin", "member"].includes(role)) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Invalid role. Must be 'admin' or 'member'.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid role. Must be 'admin' or 'member'.",
+      });
     }
 
     const membership = await Membership.findById(id).populate("organization");
@@ -125,12 +121,10 @@ export const updateMembershipRole = async (req, res) => {
       membership.organization.owner.toString() === req.user.id.toString();
 
     if (!requesterMembership && !isOwner) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Not authorized to update membership role.",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to update membership role.",
+      });
     }
 
     // Prevent removing the last admin
@@ -197,12 +191,10 @@ export const removeMembership = async (req, res) => {
       membership.organization.owner.toString() === req.user.id.toString();
 
     if (!isSelf && !requesterMembership && !isOwner) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Not authorized to remove this membership.",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to remove this membership.",
+      });
     }
 
     // Prevent removing the last admin
@@ -225,8 +217,16 @@ export const removeMembership = async (req, res) => {
     await membership.save();
 
     // Update user model for backward compatibility if it was their primary org
-    if (isSelf) {
-      await userModel.findByIdAndUpdate(req.user.id, {
+    const targetUserId = isSelf ? req.user.id : membership.user;
+    const removedOrgId = membership.organization._id || membership.organization;
+
+    const targetUser = await userModel.findById(targetUserId);
+    if (
+      targetUser &&
+      targetUser.organization &&
+      targetUser.organization.toString() === removedOrgId.toString()
+    ) {
+      await userModel.findByIdAndUpdate(targetUserId, {
         organization: null,
         role: null,
       });

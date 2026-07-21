@@ -110,7 +110,7 @@ ${textToSummarize}
 
     try {
       const hfUrl =
-        "https://api-inference.huggingface.co/models/facebook/bart-large-cnn";
+        "https://router.huggingface.co/hf-inference/models/facebook/bart-large-cnn";
 
       const hfResp = await axios.post(
         hfUrl,
@@ -172,9 +172,7 @@ ${textToSummarize}
 
     if (mom.agenda.length) {
       humanReadable += "📋 Agenda:\n";
-      mom.agenda.forEach(
-        (item, i) => (humanReadable += `${i + 1}. ${item}\n`),
-      );
+      mom.agenda.forEach((item, i) => (humanReadable += `${i + 1}. ${item}\n`));
       humanReadable += "\n";
     }
 
@@ -188,9 +186,7 @@ ${textToSummarize}
 
     if (mom.decisions.length) {
       humanReadable += "✅ Decisions:\n";
-      mom.decisions.forEach(
-        (d, i) => (humanReadable += `${i + 1}. ${d}\n`),
-      );
+      mom.decisions.forEach((d, i) => (humanReadable += `${i + 1}. ${d}\n`));
       humanReadable += "\n";
     }
 

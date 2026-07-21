@@ -28,44 +28,22 @@ const router = express.Router();
 
 // ==========================================
 // 1. BYPASSED ROUTES (No CSRF Protection)
+//    External services authenticate via their own
+//    signature/secret mechanisms, not browser cookies.
 // ==========================================
-router.use("/api/auth", authRoutes);
 router.use("/api/slack", slackWebhookParser, slackRoutes);
 router.use("/api/webhooks", webhookRoutes);
 
 // ==========================================
-// 2. DYNAMIC TEST BYPASS
+// 2. CSRF MIDDLEWARE (All routes below are protected)
 // ==========================================
-// If NODE_ENV is "test", we temporarily spoof the request method as GET
-// to bypass csurf, allowing tests to run without CSRF tokens.
-// The authCsrfRegression tests explicitly set NODE_ENV="development" to
-// enforce and test the CSRF logic.
-router.use((req, res, next) => {
-  if (process.env.NODE_ENV === "test") {
-    req.__originalMethod = req.method;
-    req.method = "GET";
-  }
-  next();
-});
-
-// ==========================================
-// 3. CSRF MIDDLEWARE
-// ==========================================
-// Natively visible to CodeQL analysis!
 router.use(csrfProtectionMiddleware);
 router.use(csrfErrorHandler);
 
-// Restore original method if it was spoofed
-router.use((req, res, next) => {
-  if (req.__originalMethod) {
-    req.method = req.__originalMethod;
-  }
-  next();
-});
-
 // ==========================================
-// 4. PROTECTED ROUTES (CSRF Enforced)
+// 3. ALL PROTECTED ROUTES (CSRF Enforced)
 // ==========================================
+router.use("/api/auth", authRoutes);
 router.use(["/api/organization", "/api/organizations"], organizationRoutes);
 router.use("/api/membership", membershipRoutes);
 router.use("/api/membership-request", membershipRequestRoutes);

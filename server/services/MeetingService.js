@@ -269,11 +269,15 @@ export const generateMeetingMoM = async (
     if (!meeting) throw new NotFoundError("Meeting not found");
 
     const hasAccess =
-      (meeting.organization && meeting.organization.toString() === user.organization.toString()) ||
-      (meeting.uploadedBy && meeting.uploadedBy.toString() === userId.toString());
+      (meeting.organization &&
+        meeting.organization.toString() === user.organization.toString()) ||
+      (meeting.uploadedBy &&
+        meeting.uploadedBy.toString() === userId.toString());
 
     if (!hasAccess) {
-      throw new ForbiddenError("Forbidden: You do not have access to this meeting");
+      throw new ForbiddenError(
+        "Forbidden: You do not have access to this meeting",
+      );
     }
 
     if (!textToSummarize) {
@@ -447,6 +451,12 @@ export const updateMeeting = async (userId, meetingId, data, doc = null) => {
 
   await meeting.save();
 
+  try {
+    eventBus.emit("meeting.updated", meeting);
+  } catch (evtErr) {
+    console.error("⚠️ Failed to emit meeting.updated event:", evtErr.message);
+  }
+
   indexMeeting(meeting).catch((err) =>
     console.error("⚠️ indexMeeting error (continuing):", err.message),
   );
@@ -475,6 +485,12 @@ export const deleteMeeting = async (doc, meetingId) => {
     const meetingIdToDelete = doc._id.toString();
     await doc.deleteOne();
 
+    try {
+      eventBus.emit("meeting.deleted", doc);
+    } catch (evtErr) {
+      console.error("⚠️ Failed to emit meeting.deleted event:", evtErr.message);
+    }
+
     // Delete from Pinecone (fire-and-forget)
     deleteMeetingFromPinecone(meetingIdToDelete).catch((err) =>
       console.error("⚠️ Pinecone deletion error (continuing):", err.message),
@@ -500,6 +516,12 @@ export const deleteMeeting = async (doc, meetingId) => {
 
   deleted = await MeetingStorageService.deleteMeetingById(meetingId);
   if (!deleted) throw new NotFoundError("Meeting not found");
+
+  try {
+    eventBus.emit("meeting.deleted", deleted);
+  } catch (evtErr) {
+    console.error("⚠️ Failed to emit meeting.deleted event:", evtErr.message);
+  }
 
   // Delete from Pinecone (fire-and-forget)
   deleteMeetingFromPinecone(meetingId).catch((err) =>
@@ -548,8 +570,10 @@ export const searchMeetings = async (
     }
   }
 
-  const results =
-    await MeetingStorageService.searchMeetingsRecords(searchQuery, filter);
+  const results = await MeetingStorageService.searchMeetingsRecords(
+    searchQuery,
+    filter,
+  );
 
   return { query: searchQuery, count: results.length, results };
 };

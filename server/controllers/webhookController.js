@@ -12,6 +12,7 @@ import {
   ForbiddenError,
   NotFoundError,
 } from "../utils/errors.js";
+import { sendSuccess } from "../utils/responseHandler.js";
 
 import dns from "dns/promises";
 import ipaddr from "ipaddr.js";
@@ -192,18 +193,21 @@ export const createWebhook = async (req, res, next) => {
 
     const webhook = await Webhook.create(webhookData);
 
-    return res.status(201).json({
-      success: true,
-      message: "Webhook registered successfully.",
-      webhook: {
-        _id: webhook._id,
-        organizationId: webhook.organizationId,
-        targetUrl: webhook.targetUrl,
-        events: webhook.events,
-        secret: webhook.secret,
-        isActive: webhook.isActive,
+    return sendSuccess(
+      res,
+      {
+        webhook: {
+          _id: webhook._id,
+          organizationId: webhook.organizationId,
+          targetUrl: webhook.targetUrl,
+          events: webhook.events,
+          secret: webhook.secret,
+          isActive: webhook.isActive,
+        },
       },
-    });
+      "Webhook registered successfully.",
+      201,
+    );
   } catch (error) {
     next(error);
   }
@@ -234,7 +238,7 @@ export const getWebhooks = async (req, res, next) => {
       createdAt: -1,
     });
 
-    return res.status(200).json({ success: true, webhooks });
+    return sendSuccess(res, { webhooks });
   } catch (error) {
     next(error);
   }
@@ -291,11 +295,7 @@ export const updateWebhook = async (req, res, next) => {
 
     await webhook.save();
 
-    return res.status(200).json({
-      success: true,
-      message: "Webhook updated successfully.",
-      webhook,
-    });
+    return sendSuccess(res, { webhook }, "Webhook updated successfully.");
   } catch (error) {
     next(error);
   }
@@ -332,10 +332,7 @@ export const deleteWebhook = async (req, res, next) => {
 
     await webhook.deleteOne();
 
-    return res.status(200).json({
-      success: true,
-      message: "Webhook deleted successfully.",
-    });
+    return sendSuccess(res, null, "Webhook deleted successfully.");
   } catch (error) {
     next(error);
   }
@@ -408,8 +405,7 @@ export const getWebhookDeliveries = async (req, res, next) => {
       .skip((page - 1) * limit)
       .limit(limit);
 
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
       deliveries,
       pagination: {
         total,
@@ -460,11 +456,11 @@ export const redeliverWebhookPayload = async (req, res, next) => {
       );
     }
 
-    return res.status(200).json({
-      success: true,
-      message: "Webhook payload redelivered successfully.",
-      delivery: newDelivery,
-    });
+    return sendSuccess(
+      res,
+      { delivery: newDelivery },
+      "Webhook payload redelivered successfully.",
+    );
   } catch (error) {
     next(error);
   }

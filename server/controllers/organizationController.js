@@ -6,6 +6,7 @@ import { createAndPushNotification } from "../services/notificationService.js";
 import mongoose from "mongoose";
 import crypto from "crypto";
 import AuditService from "../services/AuditService.js";
+import { sendSuccess, sendError } from "../utils/responseHandler.js";
 /**
  * Escape special regex characters to prevent ReDoS attacks
  */
@@ -25,17 +26,12 @@ export const createOrJoinOrganization = async (req, res) => {
 
     // Validate authentication
     if (!req.user || !req.user.id) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Authentication failed." });
+      return sendError(res, 401, "Authentication failed.");
     }
 
     // Validate org name
     if (!name || !name.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide an organization name.",
-      });
+      return sendError(res, 400, "Please provide an organization name.");
     }
 
     const userId = req.user.id;
@@ -146,18 +142,20 @@ export const createOrJoinOrganization = async (req, res) => {
         }
       : null;
 
-    res.status(200).json({
-      success: true,
-      message,
-      userData: {
-        ...updatedUser._doc,
-        role: roleStr,
-        organization: orgDoc,
+    sendSuccess(
+      res,
+      {
+        userData: {
+          ...updatedUser._doc,
+          role: roleStr,
+          organization: orgDoc,
+        },
       },
-    });
+      message,
+    );
   } catch (error) {
     console.error("❌ Error creating/joining organization:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    sendError(res, 500, "Server error");
   }
 };
 
@@ -170,10 +168,10 @@ export const getAllOrganizations = async (req, res) => {
     const organizations = await Organization.find({}, "name _id").sort({
       createdAt: -1,
     });
-    res.status(200).json({ success: true, organizations });
+    sendSuccess(res, { organizations });
   } catch (error) {
     console.error("❌ Error fetching organizations:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    sendError(res, 500, "Server error");
   }
 };
 
@@ -186,31 +184,23 @@ export const joinOrganization = async (req, res) => {
     const { organizationId } = req.body;
 
     if (!req.user || !req.user.id) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Authentication failed." });
+      return sendError(res, 401, "Authentication failed.");
     }
 
     if (!organizationId) {
-      return res
-        .status(400)
-        .json({ success: false, message: "organizationId is required." });
+      return sendError(res, 400, "organizationId is required.");
     }
 
     // Validate organizationId is a valid MongoDB ObjectId to prevent NoSQL injection
     if (!mongoose.Types.ObjectId.isValid(organizationId)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid organization ID format." });
+      return sendError(res, 400, "Invalid organization ID format.");
     }
 
     const userId = req.user.id;
 
     const organization = await Organization.findById(organizationId);
     if (!organization) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Organization not found." });
+      return sendError(res, 404, "Organization not found.");
     }
 
     const alreadyMember = organization.members.some(
@@ -255,14 +245,14 @@ export const joinOrganization = async (req, res) => {
       }
     }
 
-    res.status(200).json({
-      success: true,
-      message: "Joined organization successfully.",
-      userData: updatedUser,
-    });
+    sendSuccess(
+      res,
+      { userData: updatedUser },
+      "Joined organization successfully.",
+    );
   } catch (error) {
     console.error("❌ Error joining organization by ID:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    sendError(res, 500, "Server error");
   }
 };
 
@@ -275,31 +265,23 @@ export const selectOrganization = async (req, res) => {
     const { organizationId } = req.body;
 
     if (!req.user || !req.user.id) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Authentication failed." });
+      return sendError(res, 401, "Authentication failed.");
     }
 
     if (!organizationId) {
-      return res
-        .status(400)
-        .json({ success: false, message: "organizationId is required." });
+      return sendError(res, 400, "organizationId is required.");
     }
 
     // Validate organizationId is a valid MongoDB ObjectId to prevent NoSQL injection
     if (!mongoose.Types.ObjectId.isValid(organizationId)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid organization ID format." });
+      return sendError(res, 400, "Invalid organization ID format.");
     }
 
     const userId = req.user.id;
 
     const organization = await Organization.findById(organizationId);
     if (!organization) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Organization not found." });
+      return sendError(res, 404, "Organization not found.");
     }
 
     const isMember = organization.members.some(
@@ -307,10 +289,7 @@ export const selectOrganization = async (req, res) => {
     );
 
     if (!isMember) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not a member of this organization.",
-      });
+      return sendError(res, 403, "You are not a member of this organization.");
     }
 
     // Get user's membership role in the selected organization
@@ -334,14 +313,14 @@ export const selectOrganization = async (req, res) => {
       .findById(userId)
       .populate("organization", "name logo");
 
-    res.status(200).json({
-      success: true,
-      message: "Organization selected successfully.",
-      userData: updatedUser,
-    });
+    sendSuccess(
+      res,
+      { userData: updatedUser },
+      "Organization selected successfully.",
+    );
   } catch (error) {
     console.error("❌ Error selecting organization:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    sendError(res, 500, "Server error");
   }
 };
 
@@ -352,17 +331,12 @@ export const selectOrganization = async (req, res) => {
 export const getOrganizationMembers = async (req, res) => {
   try {
     if (!req.user || !req.user.id) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Authentication failed." });
+      return sendError(res, 401, "Authentication failed.");
     }
 
     const user = await userModel.findById(req.user.id);
     if (!user || !user.organization) {
-      return res.status(400).json({
-        success: false,
-        message: "User is not part of an organization.",
-      });
+      return sendError(res, 400, "User is not part of an organization.");
     }
 
     const organization = await Organization.findById(
@@ -373,19 +347,16 @@ export const getOrganizationMembers = async (req, res) => {
     });
 
     if (!organization) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Organization not found." });
+      return sendError(res, 404, "Organization not found.");
     }
 
-    res.status(200).json({
-      success: true,
+    sendSuccess(res, {
       members: organization.members,
       organizationName: organization.name,
     });
   } catch (error) {
     console.error("❌ Error fetching organization members:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    sendError(res, 500, "Server error");
   }
 };
 
@@ -399,9 +370,7 @@ export const getPublicOrganizationBySlug = async (req, res) => {
     const { slug } = req.params;
 
     if (!slug) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Slug is required." });
+      return sendError(res, 400, "Slug is required.");
     }
 
     // Find organization by slug - only select public fields
@@ -411,9 +380,7 @@ export const getPublicOrganizationBySlug = async (req, res) => {
     );
 
     if (!organization) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Organization not found." });
+      return sendError(res, 404, "Organization not found.");
     }
 
     // Get member count from Membership model (without exposing member details)
@@ -439,16 +406,10 @@ export const getPublicOrganizationBySlug = async (req, res) => {
       tags: metadata.tags || [],
     };
 
-    return res.status(200).json({
-      success: true,
-      organization: publicData,
-    });
+    return sendSuccess(res, { organization: publicData });
   } catch (error) {
     console.error("❌ Error fetching public organization:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
+    return sendError(res, 500, "Server error");
   }
 };
 
@@ -465,11 +426,11 @@ export const browsePublicOrganizations = async (req, res) => {
 
     // Validate pagination parameters
     if (page < 1 || limit < 1 || limit > 50) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Invalid pagination parameters. Page must be >= 1 and limit must be between 1 and 50.",
-      });
+      return sendError(
+        res,
+        400,
+        "Invalid pagination parameters. Page must be >= 1 and limit must be between 1 and 50.",
+      );
     }
 
     // Build base query - only public organizations
@@ -543,8 +504,7 @@ export const browsePublicOrganizations = async (req, res) => {
       memberCount: org.members ? org.members.length : 0,
     }));
 
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
       organizations: organizationsWithCounts,
       pagination: {
         page,
@@ -557,11 +517,7 @@ export const browsePublicOrganizations = async (req, res) => {
     });
   } catch (error) {
     console.error("❌ Error browsing public organizations:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
+    return sendError(res, 500, "Server error");
   }
 };
 
@@ -577,25 +533,16 @@ export const searchOrganizations = async (req, res) => {
     const limit = parseInt(req.query.limit) || 12;
 
     if (!q || !q.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "Search query is required.",
-      });
+      return sendError(res, 400, "Search query is required.");
     }
 
     if (q.trim().length < 2) {
-      return res.status(400).json({
-        success: false,
-        message: "Search query must be at least 2 characters.",
-      });
+      return sendError(res, 400, "Search query must be at least 2 characters.");
     }
 
     // Validate pagination parameters
     if (page < 1 || limit < 1 || limit > 50) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid pagination parameters.",
-      });
+      return sendError(res, 400, "Invalid pagination parameters.");
     }
 
     const escapedQuery = escapeRegex(q.trim());
@@ -630,8 +577,7 @@ export const searchOrganizations = async (req, res) => {
       memberCount: org.members ? org.members.length : 0,
     }));
 
-    res.status(200).json({
-      success: true,
+    sendSuccess(res, {
       organizations: organizationsWithCounts,
       pagination: {
         page,
@@ -644,7 +590,7 @@ export const searchOrganizations = async (req, res) => {
     });
   } catch (error) {
     console.error("❌ Error searching organizations:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    sendError(res, 500, "Server error");
   }
 };
 
@@ -655,9 +601,7 @@ export const searchOrganizations = async (req, res) => {
 export const getUserOrganizations = async (req, res) => {
   try {
     if (!req.user || !req.user.id) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Authentication failed." });
+      return sendError(res, 401, "Authentication failed.");
     }
 
     const Membership = (await import("../models/membershipModel.js")).default;
@@ -665,7 +609,10 @@ export const getUserOrganizations = async (req, res) => {
       user: req.user.id,
       status: "active",
     })
-      .populate("organization", "name slug description logo visibility members updatedAt")
+      .populate(
+        "organization",
+        "name slug description logo visibility members updatedAt",
+      )
       .lean();
 
     const organizations = memberships
@@ -677,10 +624,10 @@ export const getUserOrganizations = async (req, res) => {
         lastActive: m.organization.updatedAt || new Date(),
       }));
 
-    res.status(200).json({ success: true, organizations });
+    sendSuccess(res, { organizations });
   } catch (error) {
     console.error("❌ Error fetching user organizations:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    sendError(res, 500, "Server error");
   }
 };
 
@@ -726,15 +673,11 @@ export const createOrganization = async (req, res) => {
     const { name, description, logo, visibility, metadata } = req.body;
 
     if (!req.user || !req.user.id) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Authentication failed." });
+      return sendError(res, 401, "Authentication failed.");
     }
 
     if (!name || !name.trim()) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Organization name is required." });
+      return sendError(res, 400, "Organization name is required.");
     }
 
     const userId = req.user.id;
@@ -746,12 +689,7 @@ export const createOrganization = async (req, res) => {
     });
 
     if (existingOrg) {
-      return res
-        .status(409)
-        .json({
-          success: false,
-          message: "Organization with this name already exists.",
-        });
+      return sendError(res, 409, "Organization with this name already exists.");
     }
 
     // Generate unique slug
@@ -783,19 +721,18 @@ export const createOrganization = async (req, res) => {
       hasCompletedOnboarding: true,
     });
 
-    res.status(201).json({
-      success: true,
-      message: "Organization created successfully.",
-      organization,
-    });
+    sendSuccess(
+      res,
+      { organization },
+      "Organization created successfully.",
+      201,
+    );
   } catch (error) {
     console.error("❌ Error creating organization:", error);
     if (error.code === 11000) {
-      return res
-        .status(409)
-        .json({ success: false, message: "Organization slug already exists." });
+      return sendError(res, 409, "Organization slug already exists.");
     }
-    res.status(500).json({ success: false, message: "Server error" });
+    sendError(res, 500, "Server error");
   }
 };
 
@@ -815,9 +752,7 @@ export const getOrganizations = async (req, res) => {
     if (visibility) {
       // Validate visibility value
       if (!validVisibility) {
-        return res
-          .status(400)
-          .json({ success: false, message: "Invalid visibility value." });
+        return sendError(res, 400, "Invalid visibility value.");
       }
       filter.visibility = validVisibility;
     }
@@ -841,8 +776,7 @@ export const getOrganizations = async (req, res) => {
 
     const total = await Organization.countDocuments(safeFilter);
 
-    res.status(200).json({
-      success: true,
+    sendSuccess(res, {
       organizations,
       pagination: {
         page: pageNum,
@@ -853,7 +787,7 @@ export const getOrganizations = async (req, res) => {
     });
   } catch (error) {
     console.error("❌ Error fetching organizations:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    sendError(res, 500, "Server error");
   }
 };
 
@@ -868,9 +802,7 @@ export const getOrganizationById = async (req, res) => {
     // Validate input - only allow alphanumeric, hyphens, and underscores for slug
     const slugRegex = /^[a-zA-Z0-9-_]+$/;
     if (!slugRegex.test(idOrSlug)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid organization identifier." });
+      return sendError(res, 400, "Invalid organization identifier.");
     }
 
     // Try as ObjectId first, then as slug
@@ -889,10 +821,10 @@ export const getOrganizationById = async (req, res) => {
         .json({ success: false, message: "Organization not found." });
     }
 
-    res.status(200).json({ success: true, organization });
+    sendSuccess(res, { organization });
   } catch (error) {
     console.error("❌ Error fetching organization:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    sendError(res, 500, "Server error");
   }
 };
 
@@ -906,25 +838,18 @@ export const updateOrganization = async (req, res) => {
     const { name, description, logo, visibility, metadata } = req.body;
 
     if (!req.user || !req.user.id) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Authentication failed." });
+      return sendError(res, 401, "Authentication failed.");
     }
 
-    // Validate organizationId
     if (!isValidObjectId(id)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid organization ID." });
+      return sendError(res, 400, "Invalid organization ID.");
     }
 
     const cleanId = new mongoose.Types.ObjectId(String(id));
 
     // Validate visibility if provided
     if (visibility && !isValidVisibility(visibility)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid visibility value." });
+      return sendError(res, 400, "Invalid visibility value.");
     }
 
     const cleanVisibility =
@@ -935,9 +860,7 @@ export const updateOrganization = async (req, res) => {
     const organization = await Organization.findById(cleanId);
 
     if (!organization) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Organization not found." });
+      return sendError(res, 404, "Organization not found.");
     }
 
     // Check if user is owner or admin
@@ -952,12 +875,7 @@ export const updateOrganization = async (req, res) => {
       !membership &&
       organization.owner.toString() !== req.user.id.toString()
     ) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Not authorized to update this organization.",
-        });
+      return sendError(res, 403, "Not authorized to update this organization.");
     }
 
     // Update fields with sanitization
@@ -972,14 +890,10 @@ export const updateOrganization = async (req, res) => {
 
     await organization.save();
 
-    res.status(200).json({
-      success: true,
-      message: "Organization updated successfully.",
-      organization,
-    });
+    sendSuccess(res, { organization }, "Organization updated successfully.");
   } catch (error) {
     console.error("❌ Error updating organization:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    sendError(res, 500, "Server error");
   }
 };
 
@@ -992,16 +906,12 @@ export const deleteOrganization = async (req, res) => {
     const { id } = req.params;
 
     if (!req.user || !req.user.id) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Authentication failed." });
+      return sendError(res, 401, "Authentication failed.");
     }
 
     // Validate organizationId
     if (!isValidObjectId(id)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid organization ID." });
+      return sendError(res, 400, "Invalid organization ID.");
     }
 
     const cleanId = new mongoose.Types.ObjectId(String(id));
@@ -1009,19 +919,12 @@ export const deleteOrganization = async (req, res) => {
     const organization = await Organization.findById(cleanId);
 
     if (!organization) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Organization not found." });
+      return sendError(res, 404, "Organization not found.");
     }
 
     // Only owner can delete
     if (organization.owner.toString() !== req.user.id.toString()) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Not authorized to delete this organization.",
-        });
+      return sendError(res, 403, "Not authorized to delete this organization.");
     }
 
     // Delete all memberships
@@ -1030,13 +933,10 @@ export const deleteOrganization = async (req, res) => {
     // Delete organization
     await Organization.findByIdAndDelete(cleanId);
 
-    res.status(200).json({
-      success: true,
-      message: "Organization deleted successfully.",
-    });
+    sendSuccess(res, null, "Organization deleted successfully.");
   } catch (error) {
     console.error("❌ Error deleting organization:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    sendError(res, 500, "Server error");
   }
 };
 
@@ -1049,16 +949,11 @@ export const getOrganizationMembersById = async (req, res) => {
     const { id } = req.params;
 
     if (!req.user || !req.user.id) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Authentication failed." });
+      return sendError(res, 401, "Authentication failed.");
     }
 
-    // Validate organizationId
     if (!isValidObjectId(id)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid organization ID." });
+      return sendError(res, 400, "Invalid organization ID.");
     }
 
     const cleanId = new mongoose.Types.ObjectId(String(id));
@@ -1066,9 +961,7 @@ export const getOrganizationMembersById = async (req, res) => {
     const organization = await Organization.findById(cleanId);
 
     if (!organization) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Organization not found." });
+      return sendError(res, 404, "Organization not found.");
     }
 
     // Check if user is a member
@@ -1079,12 +972,7 @@ export const getOrganizationMembersById = async (req, res) => {
     }).lean();
 
     if (!membership) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Not a member of this organization.",
-        });
+      return sendError(res, 403, "Not a member of this organization.");
     }
 
     // Get all active memberships with user details
@@ -1106,13 +994,9 @@ export const getOrganizationMembersById = async (req, res) => {
       joinedAt: m.joinedAt,
     }));
 
-    res.status(200).json({
-      success: true,
-      members,
-      organizationName: organization.name,
-    });
+    sendSuccess(res, { members, organizationName: organization.name });
   } catch (error) {
     console.error("❌ Error fetching organization members:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    sendError(res, 500, "Server error");
   }
 };

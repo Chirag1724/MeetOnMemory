@@ -22,7 +22,7 @@ export const getDecisionCompliance = async (req, res) => {
     // Verify the decision belongs to the caller's organization before
     // returning anything — never leak cross-organization data.
     const decision =
-      await Decision.findById(decisionId).select("organization text");
+      await Decision.findById(decisionId).select("organization text createdAt");
 
     if (
       !decision ||
@@ -32,9 +32,15 @@ export const getDecisionCompliance = async (req, res) => {
       return sendError(res, 404, "Decision not found");
     }
 
+    const effectivePolicies = await Policy.find({
+      organization,
+      createdAt: { $lte: decision.createdAt },
+    }).select("_id");
+
     const records = await PolicyCompliance.find({
       decisionId,
       organization,
+      policyId: { $in: effectivePolicies.map((policy) => policy._id) },
     })
       .populate("policyId", "name version summary")
       .sort({ similarityScore: -1 });

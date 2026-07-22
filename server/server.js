@@ -10,9 +10,9 @@ import { configureSocket } from "./config/socket.js";
 import { startWorkers } from "./config/workers.js";
 import routes from "./routes/index.js";
 
-// Import slackService to register its eventBus 'mom.generated' listener.
-// The import itself is enough — the listener is set up at module load time.
+// Import slackService, cacheInvalidationService, and conflictScanTrigger to register eventBus listeners.
 import "./services/slackService.js";
+import "./services/cacheInvalidationService.js";
 // Import conflictScanTrigger to register its eventBus 'mom.generated'
 // listener, which enqueues a background contradiction scan per
 // organization whenever new decisions/action items are extracted.

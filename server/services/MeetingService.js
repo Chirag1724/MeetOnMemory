@@ -477,6 +477,12 @@ export const updateMeeting = async (userId, meetingId, data, doc = null) => {
 
   await meeting.save();
 
+  try {
+    eventBus.emit("meeting.updated", meeting);
+  } catch (evtErr) {
+    console.error("⚠️ Failed to emit meeting.updated event:", evtErr.message);
+  }
+
   indexMeeting(meeting).catch((err) =>
     console.error("⚠️ indexMeeting error (continuing):", err.message),
   );
@@ -505,6 +511,12 @@ export const deleteMeeting = async (doc, meetingId) => {
     const meetingIdToDelete = doc._id.toString();
     await doc.deleteOne();
 
+    try {
+      eventBus.emit("meeting.deleted", doc);
+    } catch (evtErr) {
+      console.error("⚠️ Failed to emit meeting.deleted event:", evtErr.message);
+    }
+
     // Delete from Pinecone (fire-and-forget)
     deleteMeetingFromPinecone(meetingIdToDelete).catch((err) =>
       console.error("⚠️ Pinecone deletion error (continuing):", err.message),
@@ -530,6 +542,12 @@ export const deleteMeeting = async (doc, meetingId) => {
 
   deleted = await MeetingStorageService.deleteMeetingById(meetingId);
   if (!deleted) throw new NotFoundError("Meeting not found");
+
+  try {
+    eventBus.emit("meeting.deleted", deleted);
+  } catch (evtErr) {
+    console.error("⚠️ Failed to emit meeting.deleted event:", evtErr.message);
+  }
 
   // Delete from Pinecone (fire-and-forget)
   deleteMeetingFromPinecone(meetingId).catch((err) =>

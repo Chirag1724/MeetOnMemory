@@ -15,7 +15,6 @@ jest.unstable_mockModule("../models/meetingModel.js", () => ({
     find: jest.fn(),
   },
 }));
-
 describe("aiRoutes", () => {
   it("should have tests", () => {
     expect(true).toBe(true);

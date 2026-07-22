@@ -35,7 +35,8 @@ export const getConnectionStatus = async (req, res) => {
  */
 export const getGoogleOAuthUrl = async (req, res) => {
   try {
-    const authUrl = getGoogleAuthUrl();
+    const userId = String(req.user._id);
+    const authUrl = getGoogleAuthUrl(userId);
     res.json({ success: true, authUrl });
   } catch (error) {
     console.error("Error getting Google OAuth URL:", error.message);
@@ -116,7 +117,8 @@ export const handleGoogleCallback = async (req, res) => {
  */
 export const getMicrosoftOAuthUrl = async (req, res) => {
   try {
-    const authUrl = await getMicrosoftAuthUrl();
+    const userId = String(req.user._id);
+    const authUrl = await getMicrosoftAuthUrl(userId);
     res.json({ success: true, authUrl });
   } catch (error) {
     console.error("Error getting Microsoft OAuth URL:", error.message);

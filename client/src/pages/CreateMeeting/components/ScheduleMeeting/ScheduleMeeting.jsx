@@ -1,6 +1,7 @@
 import { Calendar, Loader2, Send } from "lucide-react";
 import MeetingInformationForm from "./MeetingInformationForm";
 import ParticipantsSection from "./ParticipantsSection";
+import AvailabilityGrid from "./AvailabilityGrid";
 import AgendaSection from "./AgendaSection";
 import AttachmentSection from "./AttachmentSection";
 import CalendarNotice from "./CalendarNotice";
@@ -54,6 +55,16 @@ const ScheduleMeeting = ({ hookProps }) => {
           addParticipant={addParticipant}
           removeParticipant={removeParticipant}
         />
+
+        <div className="mb-6">
+          <AvailabilityGrid
+            participants={participants}
+            selectedDate={scheduleData.date}
+            onSlotSelect={(timeSlot) => {
+              setScheduleData((prev) => ({ ...prev, time: timeSlot }));
+            }}
+          />
+        </div>
 
         <AgendaSection
           agendaItems={agendaItems}

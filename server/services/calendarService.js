@@ -10,7 +10,7 @@ const ENCRYPTION_KEY = process.env.CALENDAR_ENCRYPTION_KEY || "default-key-chang
 /**
  * Encrypt a token for storage
  */
-const encryptToken = (token) => {
+export const encryptToken = (token) => {
   return CryptoJS.AES.encrypt(token, ENCRYPTION_KEY).toString();
 };
 
@@ -522,7 +522,7 @@ export const deleteMicrosoftEvent = async (userId, eventId) => {
 /**
  * Get Google OAuth authorization URL
  */
-export const getGoogleAuthUrl = () => {
+export const getGoogleAuthUrl = (userId) => {
   const oAuth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
@@ -537,6 +537,7 @@ export const getGoogleAuthUrl = () => {
   return oAuth2Client.generateAuthUrl({
     access_type: "offline",
     scope: scopes,
+    state: userId,
     prompt: "consent",
   });
 };
@@ -558,7 +559,7 @@ export const getGoogleTokens = async (code) => {
 /**
  * Get Microsoft OAuth authorization URL
  */
-export const getMicrosoftAuthUrl = () => {
+export const getMicrosoftAuthUrl = async (userId) => {
   const msalConfig = {
     auth: {
       clientId: process.env.MICROSOFT_CLIENT_ID,
@@ -574,6 +575,7 @@ export const getMicrosoftAuthUrl = () => {
   const authCodeUrlParameters = {
     scopes: ["https://graph.microsoft.com/Calendars.ReadWrite"],
     redirectUri: process.env.MICROSOFT_REDIRECT_URI,
+    state: userId,
   };
 
   return pca.getAuthCodeUrl(authCodeUrlParameters);

@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import Navbar from "../components/Navbar.jsx";
 import { useCalendarEvents } from "../hooks/useCalendarEvents";
 import CalendarGrid from "../components/calendar/CalendarGrid";
@@ -34,49 +33,11 @@ const Calendar = () => {
     setTypeFilter,
     orgFilter,
     setOrgFilter,
+    showExternalEvents,
+    setShowExternalEvents,
     filteredMeetings,
     uniqueOrgs,
   } = useCalendarEvents();
-
-  const [_externalEvents, setExternalEvents] = useState({ google: [], microsoft: [] });
-  const [showExternalEvents, setShowExternalEvents] = useState(true);
-
-  // Fetch external calendar events
-  useEffect(() => {
-    const fetchExternalEvents = async () => {
-      if (!showExternalEvents) return;
-
-      try {
-        const token = localStorage.getItem("token");
-        
-        // Calculate date range for current view
-        const timeMin = new Date(currentDate);
-        timeMin.setDate(1); // Start of month
-        timeMin.setHours(0, 0, 0, 0);
-        
-        const timeMax = new Date(currentDate);
-        timeMax.setMonth(timeMax.getMonth() + 1);
-        timeMax.setDate(0); // End of month
-        timeMax.setHours(23, 59, 59, 999);
-
-        const response = await axios.get("/api/calendar/external-events", {
-          headers: { Authorization: `Bearer ${token}` },
-          params: {
-            timeMin: timeMin.toISOString(),
-            timeMax: timeMax.toISOString(),
-          },
-        });
-
-        if (response.data.success) {
-          setExternalEvents(response.data.events);
-        }
-      } catch (error) {
-        console.error("Error fetching external events:", error);
-      }
-    };
-
-    fetchExternalEvents();
-  }, [currentDate, showExternalEvents]);
 
   // Handle outside click to close modal
   useEffect(() => {

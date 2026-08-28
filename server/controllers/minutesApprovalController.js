@@ -1,7 +1,76 @@
 // server/controllers/minutesApprovalController.js
+import * as minutesApprovalService from "../services/minutesApprovalService.js";
+import User from "../models/userModel.js";
 
 // Mock storage database schema for MoM Records
 const minutesStore = {};
+
+export const getApprovalStatus = async (req, res) => {
+  try {
+    const { meetingId } = req.params;
+    const status = await minutesApprovalService.getApprovalStatus(meetingId);
+    return res.status(200).json(status);
+  } catch (error) {
+    console.error("Error in getApprovalStatus:", error);
+    return res.status(500).json({ message: "Failed to get approval status", error: error.message });
+  }
+};
+
+export const submitApproval = async (req, res) => {
+  try {
+    const { meetingId } = req.params;
+    const { summary, approverIds } = req.body;
+
+    const clerkUserId = req.auth?.userId || req.auth?.clerkUserId;
+    let localUser = null;
+    if (clerkUserId) {
+      localUser = await User.findOne({ clerkUserId });
+    }
+    const submitterId = localUser?._id || req.user?._id;
+
+    if (!summary || !approverIds || !Array.isArray(approverIds)) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+    const result = await minutesApprovalService.submitForApproval(
+      meetingId,
+      submitterId,
+      summary,
+      approverIds
+    );
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("Error in submitApproval:", error);
+    return res.status(500).json({ message: "Failed to submit for approval", error: error.message });
+  }
+};
+
+export const respondApproval = async (req, res) => {
+  try {
+    const { meetingId } = req.params;
+    const { status, comment } = req.body;
+
+    const clerkUserId = req.auth?.userId || req.auth?.clerkUserId;
+    let localUser = null;
+    if (clerkUserId) {
+      localUser = await User.findOne({ clerkUserId });
+    }
+    const approverId = localUser?._id || req.user?._id;
+
+    if (!status) {
+      return res.status(400).json({ message: "Missing status field" });
+    }
+    const result = await minutesApprovalService.respondToApproval(
+      meetingId,
+      approverId,
+      status,
+      comment
+    );
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("Error in respondApproval:", error);
+    return res.status(500).json({ message: "Failed to respond to approval", error: error.message });
+  }
+};
 
 export const handleApprovalAction = async (req, res) => {
   try {

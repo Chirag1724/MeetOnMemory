@@ -1,4 +1,3 @@
-import { initRedis } from "../services/redisService.js";
 import {
   initAiResultsWorker,
   initAiGenerationWorker,
@@ -12,8 +11,8 @@ import {
   initPolicyComplianceRetryWorker,
   initEmbeddingReindexWorker,
   initMeetingQuizWorker,
-} from "../services/queueService.js";
-import { initWebhookWorker } from "../services/webhookDispatcherService.js";
+  initTranscriptionWorker,
+} from "../services/queueService.js";import { initWebhookWorker } from "../services/webhookDispatcherService.js";
 import { describeRateLimitBacking } from "../middleware/rateLimitStore.js";
 
 /**
@@ -84,9 +83,9 @@ export async function startWorkers(app) {
   await safeInit("Embedding Reindex Worker", () =>
     initEmbeddingReindexWorker(),
   );
+  await safeInit("Transcription Worker", () => initTranscriptionWorker(app));
 
-  // Pinecone pre-warm is best-effort and independent of the queue layer.
-  try {
+  // Pinecone pre-warm is best-effort and independent of the queue layer.  try {
     const { preWarmPinecone } = await import("../utils/embeddingUtils.js");
     await safeInit("Pinecone DB", () => preWarmPinecone());
   } catch {

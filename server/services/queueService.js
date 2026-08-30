@@ -2,7 +2,7 @@ import { Queue, Worker } from "bullmq";
 import Redis from "ioredis";
 import processAiResultJob from "../jobs/processAiResultJob.js";
 import processAudioJob from "../jobs/processAudioJob.js";
-import exportDataJob from "../jobs/exportDataJob.js";
+import processTranscriptionJob from "../jobs/processTranscriptionJob.js";import exportDataJob from "../jobs/exportDataJob.js";
 import cleanupExpiredExportsJob from "../jobs/cleanupExpiredExportsJob.js";
 import conflictScanJob from "./conflictDetection/conflictScanJob.js";
 import sentimentAnalysisJob from "../jobs/sentimentAnalysisJob.js";
@@ -168,9 +168,12 @@ export const embeddingReindexQueue = createQueueFacade(
   "embedding-reindex-queue",
 );
 
+export const transcriptionQueue = createQueueFacade(
+  "transcription-queue",
+);
+
 /**
- * Creates a worker, wires the standard lifecycle logging, and registers it with
- * the shutdown registry.
+ * Creates a worker, wires the standard lifecycle logging, and registers it with * the shutdown registry.
  *
  * The `failed` handler is the one behavioural addition: it now distinguishes a
  * retry from a final failure. Previously every attempt logged an identical
@@ -240,11 +243,11 @@ export const initAiResultsWorker = (app) =>
     processor: async (job) => await processAiResultJob(job, app),
   });
 
-export const initMeetingQuizWorker = (app) =>
-  createWorker({
-    name: "meeting-quiz-queue",
-    label: "Meeting Quiz Worker",
-    processor: async (job) => await meetingQuizJob(job, app),
+export async function initTranscriptionWorker(app) {
+  return await createWorker({
+    name: "transcription-queue",
+    label: "Transcription",
+    processor: (job) => processTranscriptionJob(job, app),
   });
 
 export const initAiGenerationWorker = (app) =>

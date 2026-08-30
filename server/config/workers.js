@@ -85,7 +85,8 @@ export async function startWorkers(app) {
   );
   await safeInit("Transcription Worker", () => initTranscriptionWorker(app));
 
-  // Pinecone pre-warm is best-effort and independent of the queue layer.  try {
+    // Pinecone pre-warm is best-effort and independent of the queue layer.
+  try {
     const { preWarmPinecone } = await import("../utils/embeddingUtils.js");
     await safeInit("Pinecone DB", () => preWarmPinecone());
   } catch {

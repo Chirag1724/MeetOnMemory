@@ -26,8 +26,7 @@ import path from "path";
 import os from "os";
 import OpenAI from "openai";
 
-import { sentimentAnalysisQueue } from "../services/queueService.js";
-
+import { sentimentAnalysisQueue, transcriptionQueue } from "../services/queueService.js";
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-tests",
 });

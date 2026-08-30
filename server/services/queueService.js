@@ -249,6 +249,7 @@ export async function initTranscriptionWorker(app) {
     label: "Transcription",
     processor: (job) => processTranscriptionJob(job, app),
   });
+}
 
 export const initAiGenerationWorker = (app) =>
   createWorker({

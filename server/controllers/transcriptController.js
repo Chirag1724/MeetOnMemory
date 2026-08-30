@@ -266,7 +266,8 @@ export const stopRecording = async (req, res) => {
       console.error("Failed to enqueue transcription:", err);
     }
 
-    res.status(200).json({      success: true,
+        res.status(200).json({
+      success: true,
       message: "Recording stopped, transcription started",
       transcriptId: transcript._id,
     });
@@ -811,7 +812,8 @@ export const retryTranscription = async (req, res) => {
       console.error("Failed to enqueue transcription:", err);
     }
 
-    res.status(200).json({      success: true,
+       res.status(200).json({
+      success: true,
       message: "Transcription retry started",
       transcriptId: transcript._id,
     });

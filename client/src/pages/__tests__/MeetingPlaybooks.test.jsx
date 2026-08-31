@@ -27,9 +27,7 @@ vi.mock("react-toastify", () => ({
 
 import {
   fetchPlaybooks,
-  generateAIPlaybook,
   updatePlaybook,
-  deletePlaybook,
   restorePlaybookVersion,
   applyPlaybookToMeeting,
 } from "../../api/meetingPlaybookApi";

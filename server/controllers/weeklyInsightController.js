@@ -2,10 +2,23 @@ import WeeklyInsight from "../models/weeklyInsightModel.js";
 import { generateInsight } from "../services/weeklyInsightService.js";
 import Membership from "../models/membershipModel.js";
 import EmailService from "../services/EmailService.js";
+import { resolveAuthorizedOrganizationId } from "../utils/organizationScope.js";
+
+/**
+ * Issue #2571 — the organization for every handler is the one the middleware
+ * proved belongs to the caller, never the `:orgId` read off the URL.
+ */
+const resolveOrgId = (req) => resolveAuthorizedOrganizationId(req);
 
 export const getLatestInsight = async (req, res, next) => {
   try {
-    const { orgId } = req.params;
+    const orgId = resolveOrgId(req);
+    if (!orgId) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden: Organization membership required",
+      });
+    }
     const insight = await WeeklyInsight.findOne({ organization: orgId })
       .sort({ createdAt: -1 })
       .populate("stalledActionItems.actionItem")
@@ -21,7 +34,13 @@ export const getLatestInsight = async (req, res, next) => {
 
 export const getInsightHistory = async (req, res, next) => {
   try {
-    const { orgId } = req.params;
+    const orgId = resolveOrgId(req);
+    if (!orgId) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden: Organization membership required",
+      });
+    }
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
     const skip = (page - 1) * limit;
@@ -45,7 +64,13 @@ export const getInsightHistory = async (req, res, next) => {
 
 export const triggerManualGeneration = async (req, res, next) => {
   try {
-    const { orgId } = req.params;
+    const orgId = resolveOrgId(req);
+    if (!orgId) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden: Organization membership required",
+      });
+    }
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 7);
@@ -64,7 +89,14 @@ export const triggerManualGeneration = async (req, res, next) => {
 
 export const shareWeeklyInsight = async (req, res, next) => {
   try {
-    const { orgId, insightId } = req.params;
+    const insightId = req.params.insightId;
+    const orgId = resolveOrgId(req);
+    if (!orgId) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden: Organization membership required",
+      });
+    }
     const insight = await WeeklyInsight.findOne({
       _id: insightId,
       organization: orgId,
@@ -89,7 +121,14 @@ export const shareWeeklyInsight = async (req, res, next) => {
 
 export const emailWeeklyInsight = async (req, res, next) => {
   try {
-    const { orgId, insightId } = req.params;
+    const insightId = req.params.insightId;
+    const orgId = resolveOrgId(req);
+    if (!orgId) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden: Organization membership required",
+      });
+    }
     const insight = await WeeklyInsight.findOne({
       _id: insightId,
       organization: orgId,

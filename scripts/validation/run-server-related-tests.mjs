@@ -10,7 +10,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 
 const JEST =
-  "node --experimental-vm-modules node_modules/jest/bin/jest.js --forceExit";
+  "node --max-old-space-size=4096 --experimental-vm-modules node_modules/jest/bin/jest.js --forceExit";
 const serverCwd = `${repoRoot}/server`;
 
 const TEST_FILE_REGEX = /(\.test\.|\.spec\.|__tests__)/;
@@ -117,6 +117,17 @@ const VITEST_SOURCE_TEST_MAP = {
     "server/tests/decisionLogAnalytics.vitest.test.js",
   "server/services/decisionLogService.js":
     "server/tests/decisionLogAnalytics.vitest.test.js",
+
+  "server/controllers/preMeetingBriefingController.js",
+  "server/routes/preMeetingBriefingRoutes.js",
+  "server/routes/index.js",
+]);
+const VITEST_SOURCE_TEST_MAP = {
+  "server/controllers/preMeetingBriefingController.js":
+    "server/tests/preMeetingBriefingController.vitest.test.js",
+  "server/routes/preMeetingBriefingRoutes.js":
+    "server/tests/preMeetingBriefingController.vitest.test.js",
+ main
   "server/routes/auditRoutes.js": "server/__tests__/audit.test.js",
   "server/controllers/standupController.js":
     "server/tests/standupController.vitest.test.js",

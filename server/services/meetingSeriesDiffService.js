@@ -295,6 +295,39 @@ export const meetingSeriesDiffService = {
 
     if (!meetings.length) return { timeline: [], trendMetrics: {} };
 
+    // Fetch all related entities for the entire series at once (Bulk $in queries)
+    const meetingIds = meetings.map((m) => m._id);
+    const [allActionItems, allDecisions, allTopicsDocs] = await Promise.all([
+      ActionItem.find({ sourceMeetingId: { $in: meetingIds } }).lean(),
+      Decision.find({ sourceMeetingId: { $in: meetingIds } }).lean(),
+      MeetingTopic.find({ meeting: { $in: meetingIds } }).lean(),
+    ]);
+
+    // Group entities by meeting ID for O(1) in-memory lookup
+    const actionItemsByMeeting = {};
+    const decisionsByMeeting = {};
+    const topicsByMeeting = {};
+
+    meetingIds.forEach((id) => {
+      const idStr = id.toString();
+      actionItemsByMeeting[idStr] = [];
+      decisionsByMeeting[idStr] = [];
+      topicsByMeeting[idStr] = [];
+    });
+
+    allActionItems.forEach((ai) => {
+      if (ai.sourceMeetingId)
+        actionItemsByMeeting[ai.sourceMeetingId.toString()].push(ai);
+    });
+    allDecisions.forEach((d) => {
+      if (d.sourceMeetingId)
+        decisionsByMeeting[d.sourceMeetingId.toString()].push(d);
+    });
+    allTopicsDocs.forEach((tDoc) => {
+      if (tDoc.meeting)
+        topicsByMeeting[tDoc.meeting.toString()] = tDoc.topics || [];
+    });
+
     const timeline = [];
     let totalActionItemsCompleted = 0;
     let totalActionItemsCreated = 0;
@@ -307,16 +340,47 @@ export const meetingSeriesDiffService = {
       if (i > 0) {
         const prevMeeting = meetings[i - 1];
         try {
-          const diff = await this.compareMeetings(
-            prevMeeting._id,
-            currentMeeting._id,
-            user,
-          );
-          diffSummary = diff.metrics;
+          const prevIdStr = prevMeeting._id.toString();
+          const currIdStr = currentMeeting._id.toString();
 
-          totalActionItemsCompleted += diff.actionItems.completed.length;
-          totalActionItemsCreated += diff.actionItems.added.length;
-          totalDecisions += diff.decisions.added.length;
+          // In-memory diffing
+          const agendaDiff = this._diffAgendaItems(
+            prevMeeting.agendaItems || [],
+            currentMeeting.agendaItems || [],
+          );
+          const actionItemsDiff = this._diffActionItems(
+            actionItemsByMeeting[prevIdStr],
+            actionItemsByMeeting[currIdStr],
+          );
+          const decisionsDiff = this._diffDecisions(
+            decisionsByMeeting[prevIdStr],
+            decisionsByMeeting[currIdStr],
+          );
+          const topicsDiff = this._diffTopics(
+            topicsByMeeting[prevIdStr],
+            topicsByMeeting[currIdStr],
+          );
+
+          diffSummary = {
+            added:
+              agendaDiff.added.length +
+              decisionsDiff.added.length +
+              topicsDiff.added.length +
+              actionItemsDiff.added.length,
+            removed:
+              agendaDiff.removed.length +
+              decisionsDiff.removed.length +
+              topicsDiff.removed.length,
+            carriedOver:
+              actionItemsDiff.carriedOver.length +
+              agendaDiff.modified.length +
+              topicsDiff.recurring.length,
+            completedActionItems: actionItemsDiff.completed.length,
+          };
+
+          totalActionItemsCompleted += actionItemsDiff.completed.length;
+          totalActionItemsCreated += actionItemsDiff.added.length;
+          totalDecisions += decisionsDiff.added.length;
         } catch (error) {
           console.error(
             `Failed to generate diff for ${prevMeeting._id} -> ${currentMeeting._id}`,

@@ -10,6 +10,7 @@ import {
   generatePreMeetingBriefing,
   getPreMeetingBriefing,
 } from "../services/preMeetingBriefingService.js";
+import EmailService from "../services/EmailService.js";
 
 /**
  * Helper function to validate authorization for accessing a meeting.
@@ -26,9 +27,12 @@ export const checkMeetingOrgAccess = (meeting, user) => {
   const userOrgId =
     user.organization?.toString() || user.organizationId?.toString();
   const meetingOrgId = meeting.organization?.toString();
-  const uploaderId = meeting.uploadedBy?.toString();
+  const uploaderId =
+    meeting.uploadedBy?.toString() ||
+    meeting.organizerId?.toString() ||
+    meeting.hostId?.toString();
 
-  // Access granted if user is direct uploader
+  // Access granted if user is direct uploader / organizer
   if (uploaderId && userId && uploaderId === userId) {
     return true;
   }
@@ -48,7 +52,7 @@ export const checkMeetingOrgAccess = (meeting, user) => {
  */
 export const generateBriefing = async (req, res, next) => {
   try {
-    const { meetingId } = req.params;
+    const meetingId = req.params.meetingId || req.params.id;
 
     if (
       !meetingId ||
@@ -91,13 +95,132 @@ export const generateBriefing = async (req, res, next) => {
 };
 
 /**
+ * POST /api/briefings/:meetingId/regenerate or /api/meeting/:id/briefing/regenerate
+ * Force regeneration pipeline from the latest context.
+ */
+export const regenerateBriefing = async (req, res, next) => {
+  try {
+    const meetingId = req.params.meetingId || req.params.id;
+
+    if (
+      !meetingId ||
+      typeof meetingId !== "string" ||
+      !/^[0-9a-fA-F]{24}$/.test(meetingId)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid meetingId format.",
+      });
+    }
+
+    const meeting = await Meeting.findById(meetingId);
+    if (!meeting) {
+      return res.status(404).json({
+        success: false,
+        message: "Meeting not found.",
+      });
+    }
+
+    if (!checkMeetingOrgAccess(meeting, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Unauthorized: You do not have permission to regenerate briefings for this meeting.",
+      });
+    }
+
+    const freshBriefing = await generatePreMeetingBriefing(meeting);
+
+    return res.status(200).json({
+      success: true,
+      message: "Briefing regenerated successfully.",
+      briefing: freshBriefing,
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+/**
+ * POST /api/briefings/:meetingId/share or /api/meeting/:id/briefing/share
+ * Share briefing with participants via email alerts.
+ */
+export const shareBriefingWithParticipants = async (req, res, next) => {
+  try {
+    const meetingId = req.params.meetingId || req.params.id;
+
+    if (
+      !meetingId ||
+      typeof meetingId !== "string" ||
+      !/^[0-9a-fA-F]{24}$/.test(meetingId)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid meetingId format.",
+      });
+    }
+
+    const meeting = await Meeting.findById(meetingId);
+    if (!meeting) {
+      return res.status(404).json({
+        success: false,
+        message: "Meeting not found.",
+      });
+    }
+
+    if (!checkMeetingOrgAccess(meeting, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Unauthorized: You do not have permission to share briefings for this meeting.",
+      });
+    }
+
+    const briefingUrl =
+      meeting.briefingUrl || `/meeting/${meeting._id}/briefing`;
+    if (
+      EmailService &&
+      typeof EmailService.dispatchBriefingAlerts === "function"
+    ) {
+      await EmailService.dispatchBriefingAlerts(
+        meeting.participants || [],
+        briefingUrl,
+        meeting.title,
+      );
+    } else if (
+      meeting.participants &&
+      Array.isArray(meeting.participants) &&
+      EmailService?.sendNotificationEmail
+    ) {
+      for (const p of meeting.participants) {
+        const email = typeof p === "string" ? p : p?.email;
+        if (email) {
+          await EmailService.sendNotificationEmail(
+            email,
+            `Pre-Meeting Briefing: ${meeting.title || "Meeting Briefing"}`,
+            `A pre-meeting briefing is available for your review: ${briefingUrl}`,
+          );
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Briefing successfully shared with attendees.",
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+/**
  * GET /api/briefings/:meetingId
  * Retrieves pre-meeting briefing details for a meeting.
  * Enforces meeting existence and tenant organization authorization (IDOR defense).
  */
 export const getBriefing = async (req, res, next) => {
   try {
-    const { meetingId } = req.params;
+    const meetingId = req.params.meetingId || req.params.id;
 
     if (
       !meetingId ||

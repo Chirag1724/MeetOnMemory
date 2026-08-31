@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fetchChangeLogs, fetchChangeLogStats } from "../actionItemChangeLogApi";
+import {
+  fetchChangeLogs,
+  fetchChangeLogStats,
+} from "../actionItemChangeLogApi";
 import api from "../../services/apiClient";
 
 vi.mock("../../services/apiClient", () => ({
@@ -26,6 +29,8 @@ describe("actionItemChangeLogApi (#2623) — /api prefix", () => {
     api.get.mockResolvedValue({ data: {} });
     await fetchChangeLogStats("item2");
 
-    expect(api.get).toHaveBeenCalledWith("/api/action-items/item2/changelog/stats");
+    expect(api.get).toHaveBeenCalledWith(
+      "/api/action-items/item2/changelog/stats",
+    );
   });
 });

@@ -85,9 +85,6 @@
       "name": "Breakouts"
     },
     {
-      "name": "Briefings"
-    },
-    {
       "name": "Bulk"
     },
     {
@@ -12463,6 +12460,7 @@
         }
       }
     },
+ feature/wire-decision-dashboard-2440
     "/api/decision-log/analytics": {
       "get": {
         "tags": ["Decision Log"],
@@ -12482,6 +12480,8 @@
         }
       }
     },
+
+ main
     "/api/decision-log/timeline": {
       "get": {
         "tags": ["Decision Log"],
@@ -12580,6 +12580,54 @@
       "put": {
         "tags": ["Decision Log"],
         "summary": "PUT /api/decision-log/{id}",
+ feature/wire-decision-dashboard-2440
+
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Decision Log"],
+        "summary": "DELETE /api/decision-log/{id}",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/decisions/impact/report": {
+      "get": {
+        "tags": ["Decisions"],
+        "summary": "GET /api/decisions/impact/report",
+ main
         "security": [
           {
             "bearerAuth": []
@@ -19893,53 +19941,6 @@
       "get": {
         "tags": ["Action Items"],
         "summary": "GET /api/action-items/{id}/changelog/stats",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success"
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        }
-      }
-    },
-    "/api/briefings/{meetingId}/generate": {
-      "post": {
-        "tags": ["Briefings"],
-        "summary": "POST /api/briefings/{meetingId}/generate",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success"
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        },
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/briefings/{meetingId}": {
-      "get": {
-        "tags": ["Briefings"],
-        "summary": "GET /api/briefings/{meetingId}",
         "security": [
           {
             "bearerAuth": []

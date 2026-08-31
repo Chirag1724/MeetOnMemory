@@ -99,9 +99,6 @@ const RsvpInbox = lazy(() => import("../pages/RsvpInbox.jsx"));
 const MeetingCostAnalytics = lazy(
   () => import("../pages/MeetingCostAnalytics.jsx"),
 );
-const MeetingCostsTrackerPage = lazy(
-  () => import("../pages/MeetingCostsTrackerPage.jsx"),
-);
 const MeetingCostCalculatorPage = lazy(
   () => import("../pages/MeetingCostCalculator.jsx"),
 );

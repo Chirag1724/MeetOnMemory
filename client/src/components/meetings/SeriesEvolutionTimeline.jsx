@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import apiClient from "../../services/apiClient.js";
+import { apiClient as api } from "../../services"; // assuming standard api utility
 import {
   LineChart,
   Line,
@@ -23,9 +22,7 @@ const SeriesEvolutionTimeline = ({ seriesId }) => {
   useEffect(() => {
     const fetchTimeline = async () => {
       try {
-        const response = await apiClient.get(
-          `/api/series-diff/${seriesId}/timeline`,
-        );
+        const response = await api.get(`/api/series-diff/${seriesId}/timeline`);
         setTimelineData(response.data);
       } catch (err) {
         console.error("Failed to fetch timeline:", err);
@@ -47,7 +44,7 @@ const SeriesEvolutionTimeline = ({ seriesId }) => {
     setLoadingDiff(true);
     setSelectedDiffIndex(index);
     try {
-      const response = await apiClient.get(
+      const response = await api.get(
         `/api/series-diff/compare?m1Id=${prevMeetingId}&m2Id=${currMeetingId}`,
       );
       setPairwiseDiff(response.data);
@@ -77,20 +74,7 @@ const SeriesEvolutionTimeline = ({ seriesId }) => {
       </div>
     );
 
-  const timeline = Array.isArray(timelineData?.timeline)
-    ? timelineData.timeline
-    : [];
-  const trendMetrics = timelineData?.trendMetrics || {
-    actionItemCompletionRate: 0,
-    decisionVelocity: 0,
-  };
-  const actionItemCompletionRate = (
-    (trendMetrics.actionItemCompletionRate ?? 0) * 100
-  ).toFixed(1);
-  const decisionVelocity = Number(trendMetrics.decisionVelocity ?? 0).toFixed(
-    1,
-  );
-
+  const { timeline, trendMetrics } = timelineData;
   const chartData = timeline.map((m) => ({
     name: `Occ #${m.occurrence}`,
     added: m.diffSummary?.added || 0,
@@ -111,7 +95,7 @@ const SeriesEvolutionTimeline = ({ seriesId }) => {
               Action Item Completion Rate
             </p>
             <p className="text-3xl font-bold text-blue-600">
-              {actionItemCompletionRate}%
+              {(trendMetrics.actionItemCompletionRate * 100).toFixed(1)}%
             </p>
           </div>
           <div className="p-4 bg-purple-50 rounded-lg border border-purple-100">
@@ -119,7 +103,7 @@ const SeriesEvolutionTimeline = ({ seriesId }) => {
               Avg Decisions per Meeting
             </p>
             <p className="text-3xl font-bold text-purple-600">
-              {decisionVelocity}
+              {trendMetrics.decisionVelocity.toFixed(1)}
             </p>
           </div>
         </div>
@@ -228,13 +212,12 @@ const SeriesEvolutionTimeline = ({ seriesId }) => {
                       </span>
                     </div>
                   </div>
-                  <Link
-                    to={`/meeting/${meeting.meetingId}`}
+                  <a
+                    href={`/meetings/${meeting.meetingId}`}
                     className="text-sm text-blue-600 hover:underline"
-                    data-testid={`view-meeting-${meeting.meetingId}`}
                   >
                     View Meeting
-                  </Link>
+                  </a>
                 </div>
               </div>
             </div>

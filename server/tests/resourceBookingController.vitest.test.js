@@ -46,6 +46,7 @@ describe("resourceBookingController (#2462)", () => {
   const mockUserId = "507f1f77bcf86cd799439011";
   const mockOrgId = "507f1f77bcf86cd799439022";
   const mockResourceId = "507f1f77bcf86cd799439033";
+  const mockBookingId = "507f1f77bcf86cd799439044";
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -75,6 +76,12 @@ describe("resourceBookingController (#2462)", () => {
         endTime: "2026-10-01T11:00:00.000Z",
       };
 
+      // Issue #2571: the resource is resolved server-side and must belong to
+      // the caller's organization before the booking is created.
+      PhysicalResource.findById.mockResolvedValue({
+        _id: mockResourceId,
+        organization: mockOrgId,
+      });
       ResourceBooking.findOne.mockReturnValue({
         sort: vi.fn().mockResolvedValue(null),
       });
@@ -100,6 +107,10 @@ describe("resourceBookingController (#2462)", () => {
         endTime: "2026-10-01T11:00:00.000Z",
       };
 
+      PhysicalResource.findById.mockResolvedValue({
+        _id: mockResourceId,
+        organization: mockOrgId,
+      });
       ResourceBooking.findOne.mockReturnValue({
         sort: vi.fn().mockResolvedValue({
           _id: "existing-book-1",
@@ -132,6 +143,10 @@ describe("resourceBookingController (#2462)", () => {
   describe("getResourceBookings", () => {
     it("returns all active bookings for a resource", async () => {
       req.params = { resourceId: mockResourceId };
+      PhysicalResource.findById.mockResolvedValue({
+        _id: mockResourceId,
+        organization: mockOrgId,
+      });
 
       const mockBookings = [
         {
@@ -179,9 +194,19 @@ describe("resourceBookingController (#2462)", () => {
 
   describe("cancelBooking", () => {
     it("cancels / deletes booking by ID", async () => {
-      req.params = { bookingId: "book-123" };
-      ResourceBooking.findById.mockResolvedValue({ _id: "book-123" });
-      ResourceBooking.findByIdAndDelete.mockResolvedValue({ _id: "book-123" });
+      req.params = { bookingId: mockBookingId };
+      // Issue #2571: the booking must belong to the caller's organization.
+      ResourceBooking.findById.mockResolvedValue({
+        _id: mockBookingId,
+        organization: mockOrgId,
+      });
+      ResourceBooking.findOne.mockResolvedValue({
+        _id: mockBookingId,
+        organization: mockOrgId,
+      });
+      ResourceBooking.findByIdAndDelete.mockResolvedValue({
+        _id: mockBookingId,
+      });
 
       await cancelBooking(req, res);
 
@@ -227,8 +252,14 @@ describe("resourceBookingController (#2462)", () => {
     });
 
     it("deletes a physical resource and cascading bookings", async () => {
-      req.params = { resourceId: "res-1" };
-      PhysicalResource.findByIdAndDelete.mockResolvedValue({ _id: "res-1" });
+      req.params = { resourceId: mockResourceId };
+      PhysicalResource.findById.mockResolvedValue({
+        _id: mockResourceId,
+        organization: mockOrgId,
+      });
+      PhysicalResource.findByIdAndDelete.mockResolvedValue({
+        _id: mockResourceId,
+      });
       ResourceBooking.deleteMany.mockResolvedValue({ deletedCount: 2 });
 
       await deletePhysicalResource(req, res);

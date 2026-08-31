@@ -161,6 +161,12 @@ const actionItemSchema = new mongoose.Schema(
       default: [],
     },
 
+    recurringActionItemId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "RecurringActionItem",
+      default: null,
+    },
+
     resolvedAt: {
       type: Date,
       default: null,
@@ -245,6 +251,18 @@ const actionItemSchema = new mongoose.Schema(
     archivedAt: { type: Date, default: null },
     expiresAt: { type: Date, default: null },
     lifecycleHistory: { type: [lifecycleTransitionSchema], default: [] },
+    snoozedUntil: {
+      type: Date,
+      default: null,
+    },
+    customWarningOffsets: {
+      type: [Number],
+      default: [],
+    },
+    warningsSent: {
+      type: [Number],
+      default: [],
+    },
   },
   {
     timestamps: true,

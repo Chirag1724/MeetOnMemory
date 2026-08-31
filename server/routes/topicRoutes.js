@@ -1,10 +1,15 @@
 import express from "express";
 import {
   extractForMeeting,
+  extractForOrganization,
   getTopicsForMeeting,
   getTopicClusters,
   renameCluster,
+  deleteCluster,
+  mergeClusters,
   triggerClustering,
+  getTopicVelocityAndTrends,
+  getTopicEvolutionTimeline,
 } from "../controllers/topicController.js";
 import userAuth from "../middleware/userAuth.js";
 import { requireOrgMembership } from "../middleware/rbac.js";
@@ -23,18 +28,25 @@ const router = express.Router();
 router.use(userAuth);
 router.use(requireOrgMembership);
 
+// Evolution and timeline route
+router.get("/evolution", getTopicEvolutionTimeline);
+
 // Meeting specific topic routes
 router.post("/extract/:meetingId", extractForMeeting);
 router.get("/meeting/:meetingId", getTopicsForMeeting);
 
-// Organization cluster routes.
+// Organization cluster & extraction routes.
 //
 // `:orgId` is kept rather than removed — `client/src/pages/TopicExplorer.jsx`
 // calls the parameterised URL — but the handlers now reject a value that does
 // not match the caller's own organization instead of ignoring it and returning
 // the caller's data under someone else's id.
 router.get("/clusters/org/:orgId", getTopicClusters);
+router.get("/velocity/org/:orgId", getTopicVelocityAndTrends);
 router.post("/clusters/org/:orgId/cluster", triggerClustering);
+router.post("/extract/org/:orgId", extractForOrganization);
 router.put("/clusters/:clusterId", renameCluster);
+router.delete("/clusters/:clusterId", deleteCluster);
+router.post("/clusters/:clusterId/merge", mergeClusters);
 
 export default router;

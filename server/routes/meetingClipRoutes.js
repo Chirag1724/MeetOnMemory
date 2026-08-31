@@ -1,23 +1,26 @@
 import express from "express";
 import {
-  createClip,
-  getClipsForMeeting,
-  updateClip,
-  deleteClip,
-  addAnnotation,
+  trimClipController,
+  mergeClipsController,
 } from "../controllers/meetingClipController.js";
 import userAuth from "../middleware/userAuth.js";
+import { requireOrgMembership, requirePermission } from "../middleware/rbac.js";
 
 const router = express.Router();
 
-// All clip routes require authentication
+// Apply authentication middleware to all clip routes
 router.use(userAuth);
+router.use(requireOrgMembership);
 
-// Base route is /api/clips
-router.post("/", createClip);
-router.get("/meeting/:meetingId", getClipsForMeeting);
-router.put("/:clipId", updateClip);
-router.delete("/:clipId", deleteClip);
-router.post("/:clipId/annotations", addAnnotation);
+router.post(
+  "/:clipId/trim",
+  requirePermission("meetings", "edit"),
+  trimClipController,
+);
+router.post(
+  "/merge",
+  requirePermission("meetings", "edit"),
+  mergeClipsController,
+);
 
 export default router;

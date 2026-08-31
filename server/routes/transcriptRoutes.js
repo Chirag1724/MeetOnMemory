@@ -11,7 +11,10 @@ import {
   finalizeTranscript,
   translateTranscript,
   updateSpeakers,
+  updateTranscriptSegment,
+  persistCaptionSegments,
 } from "../controllers/transcriptController.js";
+import { searchGlobalTranscripts } from "../controllers/transcriptSearchController.js";
 
 const router = express.Router();
 
@@ -21,6 +24,9 @@ router.use(apiLimiter);
 // Mounted at /api/transcripts
 // Recording/live endpoints live under /api/meetings (see meetingRoutes.js).
 // Voice search lives under /api/search/voice (see searchRoutes.js).
+
+// Global search across all transcripts
+router.get("/search/global", userAuth, searchGlobalTranscripts);
 
 // Get transcript by meeting ID
 router.get(
@@ -77,5 +83,24 @@ router.post(
 );
 // Update speaker names in transcript
 router.put("/:id/speakers", userAuth, updateSpeakers);
+
+// Update transcript segment text and timestamps (#2251)
+router.patch("/:id/segments/:segmentIndex", userAuth, updateTranscriptSegment);
+router.patch(
+  "/meeting/:meetingId/segments/:segmentIndex",
+  userAuth,
+  requireOrgAccess(Meeting),
+  requirePermission("meetings", "edit"),
+  updateTranscriptSegment,
+);
+
+// Persist live caption segments (#2246)
+router.post(
+  "/meeting/:meetingId/captions",
+  userAuth,
+  requireOrgAccess(Meeting),
+  requirePermission("meetings", "edit"),
+  persistCaptionSegments,
+);
 
 export default router;

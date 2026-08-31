@@ -1,0 +1,94 @@
+import mongoose from "mongoose";
+
+const playbookStepSchema = new mongoose.Schema({
+  title: {
+    type: String,
+    required: true,
+  },
+  durationMinutes: {
+    type: Number,
+    required: true,
+    min: 1,
+  },
+  facilitatorPrompts: {
+    type: [String],
+    default: [],
+  },
+  expectedOutputs: {
+    type: [String],
+    default: [],
+  },
+});
+
+const playbookVersionSchema = new mongoose.Schema({
+  version: {
+    type: Number,
+    required: true,
+  },
+  name: {
+    type: String,
+    required: true,
+  },
+  description: {
+    type: String,
+    default: "",
+  },
+  steps: {
+    type: [playbookStepSchema],
+    default: [],
+  },
+  savedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  savedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  },
+});
+
+const meetingPlaybookSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    description: {
+      type: String,
+      trim: true,
+    },
+    version: {
+      type: Number,
+      default: 1,
+    },
+    steps: {
+      type: [playbookStepSchema],
+      default: [],
+    },
+    versions: {
+      type: [playbookVersionSchema],
+      default: [],
+    },
+    usageCount: {
+      type: Number,
+      default: 0,
+    },
+    averageEffectivenessScore: {
+      type: Number,
+      default: 0,
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+  },
+  { timestamps: true },
+);
+
+const MeetingPlaybook = mongoose.model(
+  "MeetingPlaybook",
+  meetingPlaybookSchema,
+);
+export default MeetingPlaybook;

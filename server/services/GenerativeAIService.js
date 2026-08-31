@@ -5,6 +5,7 @@ import {
   callWithResilience,
   createCircuitBreaker,
 } from "../utils/aiResilience.js";
+import { recordAiUsageSafe } from "./aiUsageMetricsService.js";
 
 const HUGGINGFACE_API_KEY = process.env.HUGGINGFACE_API_KEY; // eslint-disable-line no-unused-vars
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -93,31 +94,44 @@ export const resetGeminiClient = () => {
  * @returns {Promise<string>} raw model output text
  */
 export const generateText = async (prompt, label) => {
-  const result = await callWithResilience(
-    async (signal) => {
-      const model = getGenerativeModel();
-      // The SDK forwards requestOptions to fetch, so a well-behaved version
-      // cancels the in-flight request on abort. withTimeout rejects regardless,
-      // so an SDK that ignores the signal still cannot hang us.
-      return await model.generateContent(prompt, { signal });
-    },
-    {
-      label,
-      timeoutMs: GEMINI_TIMEOUT_MS(),
-      retries: GEMINI_MAX_RETRIES(),
-      baseDelayMs: GEMINI_RETRY_BASE_MS(),
-      maxDelayMs: GEMINI_RETRY_MAX_MS(),
-      breaker: geminiBreaker,
-      onRetry: ({ attempt, delayMs, classification }) =>
-        console.warn(
-          `↻ ${label}: attempt ${attempt} failed (${classification.kind}` +
-            `${classification.status ? ` ${classification.status}` : ""}), ` +
-            `retrying in ${delayMs}ms`,
-        ),
-    },
-  );
+  try {
+    const result = await callWithResilience(
+      async (signal) => {
+        const model = getGenerativeModel();
+        // The SDK forwards requestOptions to fetch, so a well-behaved version
+        // cancels the in-flight request on abort. withTimeout rejects regardless,
+        // so an SDK that ignores the signal still cannot hang us.
+        return await model.generateContent(prompt, { signal });
+      },
+      {
+        label,
+        timeoutMs: GEMINI_TIMEOUT_MS(),
+        retries: GEMINI_MAX_RETRIES(),
+        baseDelayMs: GEMINI_RETRY_BASE_MS(),
+        maxDelayMs: GEMINI_RETRY_MAX_MS(),
+        breaker: geminiBreaker,
+        onRetry: ({ attempt, delayMs, classification }) =>
+          console.warn(
+            `↻ ${label}: attempt ${attempt} failed (${classification.kind}` +
+              `${classification.status ? ` ${classification.status}` : ""}), ` +
+              `retrying in ${delayMs}ms`,
+          ),
+      },
+    );
 
-  return result.response.text();
+    const usage = result?.response?.usageMetadata || {};
+    recordAiUsageSafe({
+      kind: "gemini",
+      promptTokens: usage.promptTokenCount,
+      completionTokens: usage.candidatesTokenCount,
+      totalTokens: usage.totalTokenCount,
+    });
+
+    return result.response.text();
+  } catch (err) {
+    recordAiUsageSafe({ kind: "gemini", error: true });
+    throw err;
+  }
 };
 
 /**
@@ -453,6 +467,61 @@ const chunkTextByBudget = (text, { maxChars, overlapChars }) => {
   return chunks;
 };
 
+export const describeVisualFrame = async (base64Data) => {
+  if (!GEMINI_API_KEY) return null;
+
+  const base64Content = base64Data.startsWith("data:")
+    ? base64Data.split(",")[1]
+    : base64Data;
+
+  const prompt = `
+Extract all legible text from this image and provide a concise description of any key visual diagrams, charts, or slides shown.
+Return ONLY a valid JSON object matching this structure:
+{
+  "extractedText": "...",
+  "description": "..."
+}
+`;
+
+  try {
+    const result = await callWithResilience(
+      async (signal) => {
+        const model = getGenerativeModel();
+        return await model.generateContent(
+          [
+            prompt,
+            {
+              inlineData: {
+                data: base64Content,
+                mimeType: "image/jpeg",
+              },
+            },
+          ],
+          { signal },
+        );
+      },
+      {
+        label: "Gemini vision frame",
+        timeoutMs: GEMINI_TIMEOUT_MS(),
+        retries: GEMINI_MAX_RETRIES(),
+        baseDelayMs: GEMINI_RETRY_BASE_MS(),
+        maxDelayMs: GEMINI_RETRY_MAX_MS(),
+        breaker: geminiBreaker,
+        onRetry: ({ attempt, delayMs, classification: _classification }) =>
+          console.warn(
+            `↻ Gemini vision: attempt ${attempt} failed, retrying in ${delayMs}ms`,
+          ),
+      },
+    );
+
+    const outputText = result.response.text();
+    return parseJsonOutput(outputText);
+  } catch (err) {
+    console.error("❌ Vision API failed:", err.message);
+    return null;
+  }
+};
+
 const buildMoMPrompt = (
   transcriptSegment,
   date,
@@ -468,6 +537,9 @@ const buildMoMPrompt = (
   const customInstructionsNotice = customInstructions
     ? `\n⚠️ CUSTOM INSTRUCTIONS: ${customInstructions}\n`
     : "";
+  const visualContextNotice = context.visualFramesText
+    ? `\n🖼️ VISUAL CONTEXT (Slides/Diagrams shown during the meeting):\n${context.visualFramesText}\nInclude references to these visual diagrams in the summary where relevant.\n`
+    : "";
 
   return `
 You are an advanced AI meeting assistant responsible for preparing *formal, well-structured Minutes of Meeting (MoM)*
@@ -476,6 +548,7 @@ The MoM should be factual, concise, and formatted for professional use in organi
 Avoid repetition, filler words, and unnecessary phrases. Capture key insights, outcomes, and responsibilities accurately.
 ${chunkNotice}
 ${customInstructionsNotice}
+${visualContextNotice}
 🎯 Your goal is to return a clean JSON object with the following fields:
 {
   "title": "A clear, professional meeting title (e.g., 'AI Integration Strategy Discussion')",
@@ -546,6 +619,7 @@ export const generateMoMDetailed = async (
   date,
   title,
   customInstructions = null,
+  visualFramesText = null,
 ) => {
   const source = String(textToSummarize ?? "");
   const startedAt = Date.now();
@@ -572,7 +646,7 @@ export const generateMoMDetailed = async (
         usedChunks[index],
         date,
         title,
-        { part: index + 1, totalParts: usedChunks.length },
+        { part: index + 1, totalParts: usedChunks.length, visualFramesText },
         customInstructions,
       );
 
@@ -739,4 +813,253 @@ Return ONLY a valid JSON object matching this structure (no markdown formatting,
   }
 
   return parsed.report;
+};
+
+export const generateHighlightReelAI = async (
+  meetingTitle,
+  transcript,
+  keyMoments,
+  sentimentTimeline,
+) => {
+  if (!GEMINI_API_KEY) {
+    throw new Error(
+      "Highlight Reel generation is unavailable: GEMINI_API_KEY is not configured.",
+    );
+  }
+
+  const prompt = `
+You are an AI meeting assistant. Create a structured highlight reel for the meeting: "${meetingTitle}".
+
+Here is the meeting transcript (in segments):
+${JSON.stringify(transcript, null, 2)}
+
+Here are the user-identified key moments:
+${JSON.stringify(keyMoments, null, 2)}
+
+Here is the sentiment timeline:
+${JSON.stringify(sentimentTimeline, null, 2)}
+
+Your task is to identify the most critical 3-8 highlights from the meeting (e.g., breakthroughs, key decisions, action items, important debates).
+For each highlight, include:
+- type: "decision", "action_item", "insight", "breakthrough", "debate", or "other"
+- timestamp: The start time in seconds (match with transcript/key moment data)
+- speaker: The person speaking
+- excerpt: An exact quote or highly accurate paraphrase from the transcript
+- sentiment: "positive", "neutral", or "negative"
+- importance: An integer from 1-10
+- aiRationale: A brief explanation (1-2 sentences) of why this moment was selected as a highlight.
+
+Also, provide an overall "narrative" (2-3 paragraphs) summarizing the arc of the meeting.
+
+Return ONLY a valid JSON object matching this structure (no markdown formatting, no commentary):
+{
+  "narrative": "Overall narrative...",
+  "highlights": [
+    {
+      "type": "decision",
+      "timestamp": 120,
+      "speaker": "Alice",
+      "excerpt": "We are going with the new design.",
+      "sentiment": "positive",
+      "importance": 9,
+      "aiRationale": "This was the final decision made on the primary agenda topic."
+    }
+  ]
+}
+`;
+
+  let outputText;
+  try {
+    // Generate text using the shared resilient method
+    outputText = await generateText(prompt, "Gemini highlight reel");
+  } catch (err) {
+    console.error("❌ Highlight reel generation failed:", err.message);
+    throw new Error(
+      `Highlight reel generation failed (${err.kind ?? AI_ERROR_KIND.UNKNOWN}): ${err.message}`,
+    );
+  }
+
+  const parsed = parseJsonOutput(outputText);
+  if (!parsed || !parsed.narrative || !Array.isArray(parsed.highlights)) {
+    throw new Error("Failed to parse Gemini JSON output for highlight reel");
+  }
+
+  return parsed;
+};
+
+export const generateSeriesRetrospectiveSummary = async (
+  seriesTitle,
+  metricsData,
+) => {
+  if (!GEMINI_API_KEY) {
+    throw new Error(
+      "Series Retrospective generation is unavailable: GEMINI_API_KEY is not configured.",
+    );
+  }
+
+  const prompt = `
+You are an AI meeting assistant. Your task is to generate a narrative retrospective summary for a meeting series.
+Series Title: "${seriesTitle}"
+
+Here is the aggregated metrics data for the series:
+${JSON.stringify(metricsData, null, 2)}
+
+Based on this data, provide a professional, 3-4 paragraph narrative summarizing the evolution of this meeting series.
+Focus on:
+1. Are topics recurring too often without resolution?
+2. Are action items being completed consistently, or are there chronic carryovers?
+3. How is the attendance trend?
+4. How is the overall sentiment evolving?
+5. Are decisions actually being followed through?
+
+Return ONLY a valid JSON object matching this structure (no markdown formatting, no commentary):
+{
+  "summary": "The narrative summary..."
+}
+`;
+
+  let outputText;
+  try {
+    outputText = await generateText(prompt, "Gemini series retrospective");
+  } catch (err) {
+    console.error("❌ Series retrospective generation failed:", err.message);
+    throw new Error(
+      `Series retrospective generation failed (${err.kind ?? AI_ERROR_KIND.UNKNOWN}): ${err.message}`,
+    );
+  }
+
+  const parsed = parseJsonOutput(outputText);
+  if (!parsed || !parsed.summary) {
+    throw new Error(
+      "Failed to parse Gemini JSON output for series retrospective",
+    );
+  }
+
+  return parsed.summary;
+};
+
+export const generateStandupReportAI = async (
+  userName,
+  timeframe,
+  meetingsContext,
+  completedItemsContext,
+  upcomingItemsContext,
+  blockersContext,
+  decisionsContext,
+) => {
+  if (!GEMINI_API_KEY) {
+    throw new Error(
+      "Standup report generation is unavailable: GEMINI_API_KEY is not configured.",
+    );
+  }
+
+  const prompt = `
+You are an AI assistant tasked with writing a concise, professional standup report for a team member named ${userName}.
+The timeframe for this report is: ${timeframe}.
+
+Here is the data context for ${userName}:
+
+Attended Meetings:
+${meetingsContext}
+
+Decisions Participated In:
+${decisionsContext}
+
+Completed Action Items:
+${completedItemsContext}
+
+Upcoming Action Items:
+${upcomingItemsContext}
+
+Overdue/Blocked Action Items:
+${blockersContext}
+
+Write a standup-style report (written in the first person, as if ${userName} is speaking) covering:
+1. What I did (accomplishments, completed items, meetings attended)
+2. What I will do (upcoming tasks, ongoing focus)
+3. Blockers (anything overdue or explicitly marked blocked)
+
+Keep it concise, actionable, and suitable for a team update. Do not invent information; only use what is provided. If a section is empty, summarize appropriately without making things up.
+
+Return ONLY a valid JSON object matching this structure (no markdown formatting, no commentary):
+{
+  "summary": "A 2-3 paragraph standup report"
+}
+`;
+
+  let outputText;
+  try {
+    outputText = await generateText(prompt, "Gemini standup report");
+  } catch (err) {
+    console.error("❌ Standup report generation failed:", err.message);
+    throw new Error(
+      `Standup report generation failed (${err.kind ?? AI_ERROR_KIND.UNKNOWN}): ${err.message}`,
+    );
+  }
+
+  const parsed = parseJsonOutput(outputText);
+  if (!parsed || !parsed.summary) {
+    throw new Error("Failed to parse Gemini JSON output for standup report");
+  }
+
+  return parsed.summary;
+};
+
+export const generateAbsenteeCatchUpAI = async (
+  meetingTitle,
+  absenteeName,
+  meetingSummary,
+  actionItems,
+  decisions,
+  mentions,
+) => {
+  if (!GEMINI_API_KEY) {
+    throw new Error(
+      "Absentee catch-up generation is unavailable: GEMINI_API_KEY is not configured.",
+    );
+  }
+
+  const prompt = `
+You are an AI assistant helping to prepare a personalized meeting catch-up digest for an absent participant.
+The participant's name is ${absenteeName}, and they missed the meeting: "${meetingTitle}".
+
+Here is the general summary of the meeting:
+${JSON.stringify(meetingSummary, null, 2)}
+
+Here are the decisions made during the meeting:
+${JSON.stringify(decisions, null, 2)}
+
+Here are the action items resulting from the meeting:
+${JSON.stringify(actionItems, null, 2)}
+
+Here are specific moments they were mentioned:
+${JSON.stringify(mentions, null, 2)}
+
+Based on this information, generate a concise, professional personalized catch-up report tailored specifically for ${absenteeName}. 
+The report should summarize what they missed, clearly state any decisions that affect them, highlight any action items assigned to them, and explain context around when they were mentioned.
+
+Return ONLY a valid JSON object matching this structure (no markdown formatting, no commentary):
+{
+  "catchUpReport": "A comprehensive 2-3 paragraph personalized catch-up report.",
+  "actionItemsAssigned": ["...", "..."],
+  "keyTakeaways": ["...", "..."]
+}
+`;
+
+  let outputText;
+  try {
+    outputText = await generateText(prompt, "Gemini absentee catch-up");
+  } catch (err) {
+    console.error("❌ Absentee catch-up generation failed:", err.message);
+    throw new Error(
+      `Absentee catch-up generation failed (${err.kind ?? AI_ERROR_KIND.UNKNOWN}): ${err.message}`,
+    );
+  }
+
+  const parsed = parseJsonOutput(outputText);
+  if (!parsed || !parsed.catchUpReport) {
+    throw new Error("Failed to parse Gemini JSON output for absentee catch-up");
+  }
+
+  return parsed;
 };

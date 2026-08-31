@@ -7,6 +7,7 @@ import {
   MODEL_REGISTRY,
 } from "../services/conflictDetection/conflictDetectionService.js";
 import { sendSuccess, sendError } from "../utils/responseHandler.js";
+import { parsePagination } from "../utils/pagination.js";
 
 const VALID_MODEL_TYPES = Object.keys(MODEL_REGISTRY);
 const VALID_STATUSES = ["open", "resolved", "dismissed", "all"];
@@ -97,7 +98,7 @@ export const scanForConflicts = async (req, res) => {
 export const getConflicts = async (req, res) => {
   try {
     const organization = req.user.organization || null;
-    const { model, status = "open", limit = 50 } = req.query;
+    const { model, status = "open" } = req.query;
 
     if (model && !VALID_MODEL_TYPES.includes(model)) {
       return sendError(
@@ -114,9 +115,9 @@ export const getConflicts = async (req, res) => {
       );
     }
 
-    const parsedLimit = Number(limit);
-    const safeLimit =
-      Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 50;
+    const { limit: safeLimit } = parsePagination(req.query, {
+      defaultLimit: 50,
+    });
 
     const conflicts = await listConflictSets(model, {
       organization,
@@ -222,5 +223,124 @@ export const resolveConflict = async (req, res) => {
       isClientError ? 400 : 500,
       error.message || "Failed to resolve conflict",
     );
+  }
+};
+
+/**
+ * GET /api/knowledge/conflicts/audit-history
+ * Returns the immutable audit trail of all conflict resolutions in this org.
+ */
+export const getConflictAuditHistory = async (req, res) => {
+  try {
+    const organization = req.user.organization || null;
+    if (!organization) {
+      return sendError(res, 403, "Organization context required");
+    }
+
+    const { limit = 50, page = 1 } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    // Filter audit logs specifically for conflict resolutions
+    const history = await AuditLog.find({
+      organization,
+      action: { $in: ["conflict_resolved", "conflict_bulk_resolved"] },
+    })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit))
+      .populate("actor", "name email");
+
+    const total = await AuditLog.countDocuments({
+      organization,
+      action: { $in: ["conflict_resolved", "conflict_bulk_resolved"] },
+    });
+
+    sendSuccess(res, {
+      history,
+      total,
+      page: Number(page),
+      limit: Number(limit),
+    });
+  } catch (error) {
+    console.error("getConflictAuditHistory error:", error);
+    sendError(res, 500, "Failed to fetch conflict audit history");
+  }
+};
+
+/**
+ * POST /api/knowledge/conflicts/bulk-resolve
+ * Body: { conflictIds: string[], resolutionType: "dismissed" | "custom_value", customValue?: string }
+ */
+export const bulkResolveConflicts = async (req, res) => {
+  try {
+    const organization = req.user.organization || null;
+    if (!organization) {
+      return sendError(res, 403, "Organization context required");
+    }
+
+    const { conflictIds, resolutionType, customValue, note } = req.body;
+
+    if (!Array.isArray(conflictIds) || conflictIds.length === 0) {
+      return sendError(res, 400, "conflictIds array is required");
+    }
+
+    if (!["dismissed", "custom_value"].includes(resolutionType)) {
+      return sendError(res, 400, "Invalid resolutionType for bulk resolve");
+    }
+
+    const results = [];
+    const errors = [];
+
+    // Process sequentially to ensure proper data consistency and error handling
+    for (const conflictId of conflictIds) {
+      try {
+        const conflict = await getConflictSetById(conflictId);
+        if (
+          !conflict ||
+          conflict.organization?.toString() !== organization.toString()
+        ) {
+          errors.push({ id: conflictId, error: "Not found or forbidden" });
+          continue;
+        }
+
+        const resolved = await resolveConflictSet(conflictId, {
+          resolutionType,
+          customValue,
+          note,
+          resolvedBy: req.user._id,
+        });
+
+        results.push(resolved._id);
+      } catch (err) {
+        errors.push({ id: conflictId, error: err.message });
+      }
+    }
+
+    // Write a single bulk audit log entry
+    if (results.length > 0) {
+      await AuditLog.create({
+        organization,
+        actor: req.user._id,
+        action: "conflict_bulk_resolved",
+        entity: "ConflictSet",
+        entityId: results[0], // the first one, or null
+        details: {
+          resolvedCount: results.length,
+          conflictIds: results,
+          resolutionType,
+          customValue:
+            resolutionType === "custom_value" ? customValue : undefined,
+        },
+      });
+    }
+
+    sendSuccess(res, {
+      message: `Successfully resolved ${results.length} conflicts.`,
+      resolvedIds: results,
+      errors: errors.length > 0 ? errors : undefined,
+    });
+  } catch (error) {
+    console.error("bulkResolveConflicts error:", error);
+    sendError(res, 500, "Failed to bulk resolve conflicts");
   }
 };

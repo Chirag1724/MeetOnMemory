@@ -81,7 +81,7 @@ export const toggleBookmark = async (req, res) => {
 export const getBookmarks = async (req, res) => {
   try {
     const userId = req.user._id;
-    const { collectionName } = req.query;
+    const { collectionName, search } = req.query;
 
     const query = { user: userId };
     if (collectionName) {
@@ -103,7 +103,18 @@ export const getBookmarks = async (req, res) => {
       select: "title date time duration _id",
     });
 
-    const responseData = bookmarks.map((b) => {
+    let filteredBookmarks = bookmarks;
+    if (search && typeof search === "string") {
+      const regex = new RegExp(search, "i");
+      filteredBookmarks = bookmarks.filter(
+        (b) =>
+          regex.test(b.notes || "") ||
+          regex.test(b.collectionName || "") ||
+          (b.meeting && regex.test(b.meeting.title || "")),
+      );
+    }
+
+    const responseData = filteredBookmarks.map((b) => {
       const obj = b.toObject();
       obj.rawMeetingId = rawMeetingIds.get(b._id.toString()) || null;
       return obj;
@@ -183,5 +194,247 @@ export const deleteCollection = async (req, res) => {
   } catch (error) {
     console.error("Error in deleteCollection:", error);
     res.status(500).json({ message: "Server error deleting collection" });
+  }
+};
+
+// @desc    Rename or update collection color for user
+// @route   PUT /api/bookmarks/collections/:name
+// @access  Private
+export const updateCollection = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const oldName = String(req.params.name);
+    const { name: newName, color } = req.body;
+
+    if (!newName && !color) {
+      return res
+        .status(400)
+        .json({ message: "New collection name or color is required" });
+    }
+
+    const updateFields = {};
+    if (newName) updateFields.collectionName = newName.trim();
+    if (color) updateFields.color = color;
+
+    const result = await Bookmark.updateMany(
+      { user: userId, collectionName: oldName },
+      { $set: updateFields },
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: `Collection ${oldName} updated`,
+      modifiedCount: result.modifiedCount,
+    });
+  } catch (error) {
+    console.error("Error in updateCollection:", error);
+    res.status(500).json({ message: "Server error updating collection" });
+  }
+};
+
+// @desc    Add meeting bookmark
+// @route   POST /api/meetings/:id/bookmark
+// @access  Private
+export const addMeetingBookmark = async (req, res) => {
+  try {
+    const meetingId = req.params.id;
+    const userId = req.user._id;
+    const { collectionName, notes, color } = req.body || {};
+
+    if (!mongoose.Types.ObjectId.isValid(meetingId)) {
+      return res.status(400).json({ message: "Invalid meeting ID" });
+    }
+
+    const meeting =
+      await Meeting.findById(meetingId).select("organization _id");
+    if (!meeting) {
+      return res.status(404).json({ message: "Meeting not found" });
+    }
+
+    if (!isSameOrganization(req.user, meeting)) {
+      return res.status(403).json({
+        message: "Meeting does not belong to your organization",
+      });
+    }
+
+    let bookmark = await Bookmark.findOne({
+      user: userId,
+      meeting: meetingId,
+    });
+
+    if (!bookmark) {
+      bookmark = await Bookmark.create({
+        user: userId,
+        meeting: meetingId,
+        collectionName: collectionName || "Uncategorized",
+        notes: notes || "",
+        color: color || "#3b82f6",
+      });
+    }
+
+    return res.status(200).json({
+      message: "Meeting bookmarked successfully",
+      bookmarked: true,
+      data: bookmark,
+    });
+  } catch (error) {
+    console.error("Error adding meeting bookmark:", error);
+    res.status(500).json({ message: "Server error bookmarking meeting" });
+  }
+};
+
+// @desc    Remove meeting bookmark
+// @route   DELETE /api/meetings/:id/bookmark
+// @access  Private
+export const removeMeetingBookmark = async (req, res) => {
+  try {
+    const meetingId = req.params.id;
+    const userId = req.user._id;
+
+    if (!mongoose.Types.ObjectId.isValid(meetingId)) {
+      return res.status(400).json({ message: "Invalid meeting ID" });
+    }
+
+    await Bookmark.deleteOne({ user: userId, meeting: meetingId });
+
+    return res.status(200).json({
+      message: "Bookmark removed successfully",
+      bookmarked: false,
+    });
+  } catch (error) {
+    console.error("Error removing meeting bookmark:", error);
+    res.status(500).json({ message: "Server error removing bookmark" });
+  }
+};
+
+// @desc    Get bookmark status for a meeting
+// @route   GET /api/meetings/:id/bookmark
+// @access  Private
+export const getMeetingBookmarkStatus = async (req, res) => {
+  try {
+    const meetingId = req.params.id;
+    const userId = req.user._id;
+
+    if (!mongoose.Types.ObjectId.isValid(meetingId)) {
+      return res.status(400).json({ message: "Invalid meeting ID" });
+    }
+
+    const bookmark = await Bookmark.findOne({
+      user: userId,
+      meeting: meetingId,
+    });
+
+    return res.status(200).json({
+      bookmarked: Boolean(bookmark),
+      bookmark: bookmark || null,
+    });
+  } catch (error) {
+    console.error("Error getting meeting bookmark status:", error);
+    res.status(500).json({ message: "Server error checking bookmark status" });
+  }
+};
+
+// @desc    Get all bookmarked meetings for current user
+// @route   GET /api/meetings/bookmarked
+// @access  Private
+export const getBookmarkedMeetings = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { collectionName } = req.query;
+
+    const query = { user: userId };
+    if (collectionName) {
+      query.collectionName = String(collectionName);
+    }
+
+    const bookmarks = await Bookmark.find(query)
+      .sort({ createdAt: -1 })
+      .populate({
+        path: "meeting",
+        select:
+          "title date time duration meetingType status organization description _id",
+      });
+
+    // Filter out orphaned bookmarks where meeting was deleted
+    const validBookmarks = bookmarks.filter((b) => b.meeting !== null);
+    const meetings = validBookmarks.map((b) => ({
+      ...b.meeting.toObject(),
+      bookmarkId: b._id,
+      collectionName: b.collectionName,
+      bookmarkNotes: b.notes,
+      bookmarkColor: b.color,
+      bookmarkedAt: b.createdAt,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      count: meetings.length,
+      data: meetings,
+    });
+  } catch (error) {
+    console.error("Error fetching bookmarked meetings:", error);
+    res
+      .status(500)
+      .json({ message: "Server error fetching bookmarked meetings" });
+  }
+};
+
+// @desc    Share a collection with org members
+// @route   POST /api/bookmarks/collections/:name/share
+// @access  Private
+export const shareCollection = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const collectionName = String(req.params.name);
+    const { emails } = req.body;
+
+    if (!emails || !Array.isArray(emails) || emails.length === 0) {
+      return res
+        .status(400)
+        .json({ message: "Emails array is required to share collection" });
+    }
+
+    const User = (await import("../models/userModel.js")).default;
+    // Find users in the same organization
+    const targetUsers = await User.find({
+      email: { $in: emails },
+      organization: req.user.organization,
+    });
+
+    if (targetUsers.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "No valid users found in your organization." });
+    }
+
+    const bookmarks = await Bookmark.find({ user: userId, collectionName });
+    if (bookmarks.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "Collection is empty or does not exist." });
+    }
+
+    const newBookmarks = [];
+    for (const targetUser of targetUsers) {
+      for (const b of bookmarks) {
+        newBookmarks.push({
+          user: targetUser._id,
+          meeting: b.meeting,
+          collectionName: `Shared: ${collectionName}`,
+          notes: b.notes,
+          color: b.color,
+        });
+      }
+    }
+
+    // Insert ignoring duplicates (if target user already bookmarked the meeting)
+    await Bookmark.insertMany(newBookmarks, { ordered: false }).catch(() => {
+      // Ignore bulk write errors from unique index constraint
+    });
+
+    res.status(200).json({ message: "Collection shared successfully." });
+  } catch (error) {
+    console.error("Error in shareCollection:", error);
+    res.status(500).json({ message: "Server error sharing collection" });
   }
 };

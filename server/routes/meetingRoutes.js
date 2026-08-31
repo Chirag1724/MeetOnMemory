@@ -22,11 +22,14 @@ import {
   summarizeMeeting, // EXISTING: Generate AI summary/MOM
   getAllMeetings,
   getMeetingById, // NEW: Get single meeting details
+  exportMeetingNotes, // Export meeting notes as Markdown (#2543)
   updateMeeting, // NEW: Update meeting (rename)
   deleteMeeting, // Soft-delete meeting
   getDeletedMeetings,
   restoreDeletedMeeting,
   permanentlyDeleteMeeting,
+  getPurgePreviewController,
+  purgeTrashController,
   searchMeetingsByText, // 🆕 NEW: Voice/Text Search
   archiveMeeting,
   restoreMeeting,
@@ -37,7 +40,16 @@ import {
   regenerateMeetingInvite,
   updateMeetingInvite,
   resolveMeetingInvite,
+  anonymizeMeeting,
+  getRawTranscript,
+  cloneMeeting,
 } from "../controllers/meetingController.js";
+import {
+  addMeetingBookmark,
+  removeMeetingBookmark,
+  getMeetingBookmarkStatus,
+  getBookmarkedMeetings,
+} from "../controllers/bookmarkController.js";
 import {
   resendDigest,
   previewDigest,
@@ -55,7 +67,11 @@ import {
   retryTranscription,
   uploadTranscriptChunk,
   storeEncryptedTranscript,
+  persistCaptionSegments,
 } from "../controllers/transcriptController.js";
+import { getMeetingRoles } from "../controllers/roleRotationController.js";
+import { getOrgRetentionLeaderboard } from "../controllers/meetingQuizController.js";
+import { initiateTransfer } from "../controllers/meetingOwnershipTransferController.js";
 
 import path from "path";
 import { ValidationError } from "../utils/errors.js";
@@ -94,7 +110,7 @@ const ALLOWED_RECORDING_EXTENSIONS = [
   ".mkv",
 ];
 
-const meetingRecordingFilter = (req, file, cb) => {
+export const meetingRecordingFilter = (req, file, cb) => {
   if (!file) {
     return cb(null, true);
   }
@@ -126,9 +142,10 @@ const transcriptUpload = multer({
   limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit
   fileFilter: meetingRecordingFilter,
 });
-const transcriptChunkUpload = multer({
+export const transcriptChunkUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit per chunk
+  fileFilter: meetingRecordingFilter,
 });
 
 // Apply rate limiting to all routes
@@ -168,6 +185,16 @@ router.post(
   uploadTranscriptAudio,
 );
 
+// POST /api/meetings/:meetingId/clone
+router.post(
+  "/:meetingId/clone",
+  userAuth,
+  uploadLimiter,
+  requireOrgMembership,
+  requirePermission("meetings", "create"),
+  cloneMeeting,
+);
+
 // POST /api/meetings/:meetingId/transcript/chunk
 router.post(
   "/:meetingId/transcript/chunk",
@@ -198,6 +225,16 @@ router.post(
   storeEncryptedTranscript,
 );
 
+// POST /api/meetings/:meetingId/transcript/captions (Issue #2246)
+router.post(
+  "/:meetingId/transcript/captions",
+  userAuth,
+  writeLimiter,
+  requireOrgMembership,
+  requirePermission("meetings", "edit"),
+  persistCaptionSegments,
+);
+
 // POST /api/meetings/:meetingId/transcript/retry
 router.post(
   "/:meetingId/transcript/retry",
@@ -208,9 +245,27 @@ router.post(
   retryTranscription,
 );
 
+// GET /api/meetings/:meetingId/roles
+router.get(
+  "/:meetingId/roles",
+  userAuth,
+  requireOrgMembership,
+  requirePermission("meetings", "view"),
+  getMeetingRoles,
+);
+
 // ========== EXISTING ROUTES (Working) ==========
 
+import {
+  initResumableUpload,
+  uploadChunk,
+  getUploadStatus,
+  completeResumableUpload,
+  abortResumableUpload,
+} from "../controllers/resumableUploadController.js";
+
 // ✅ Upload & Transcribe Meeting (from UploadMeetings page) - admin only
+
 router.post(
   "/upload",
   userAuth,
@@ -220,6 +275,52 @@ router.post(
   requirePermission("meetings", "create"),
   upload.single("file"),
   uploadMeeting,
+);
+
+// Resumable Chunk Upload Routes (#2268)
+router.post(
+  "/upload/init",
+  userAuth,
+  uploadLimiter,
+  requireOrgMembership,
+  requirePermission("meetings", "create"),
+  initResumableUpload,
+);
+
+router.post(
+  "/upload/chunk",
+  userAuth,
+  uploadLimiter,
+  requireOrgMembership,
+  requirePermission("meetings", "create"),
+  upload.single("chunk"),
+  uploadChunk,
+);
+
+router.get(
+  "/upload/status/:uploadId",
+  userAuth,
+  requireOrgMembership,
+  requirePermission("meetings", "create"),
+  getUploadStatus,
+);
+
+router.post(
+  "/upload/complete",
+  userAuth,
+  uploadLimiter,
+  requireOrgMembership,
+  requirePermission("meetings", "create"),
+  completeResumableUpload,
+);
+
+router.post(
+  "/upload/abort",
+  userAuth,
+  uploadLimiter,
+  requireOrgMembership,
+  requirePermission("meetings", "create"),
+  abortResumableUpload,
 );
 
 // ✅ Summarize Transcript (send meetingId or transcript)
@@ -239,6 +340,40 @@ router.get(
   requireOrgMembership,
   requirePermission("meetings", "view"),
   getAllMeetings,
+);
+
+// ✅ Fetch All Bookmarked Meetings for current user (#1827)
+router.get(
+  "/bookmarked",
+  userAuth,
+  requireOrgMembership,
+  requirePermission("meetings", "view"),
+  getBookmarkedMeetings,
+);
+
+// ✅ Meeting bookmark operations (#1827)
+router.post(
+  "/:id/bookmark",
+  userAuth,
+  writeLimiter,
+  requireOrgMembership,
+  requirePermission("meetings", "view"),
+  addMeetingBookmark,
+);
+router.delete(
+  "/:id/bookmark",
+  userAuth,
+  writeLimiter,
+  requireOrgMembership,
+  requirePermission("meetings", "view"),
+  removeMeetingBookmark,
+);
+router.get(
+  "/:id/bookmark",
+  userAuth,
+  requireOrgMembership,
+  requirePermission("meetings", "view"),
+  getMeetingBookmarkStatus,
 );
 
 // ✅ Resolve shareable meeting invite (must be before /:id)
@@ -277,6 +412,23 @@ router.get(
   requirePermission("meetings", "view"),
   getDeletedMeetings,
 );
+router.get(
+  "/trash/purge-preview",
+  userAuth,
+  requireAdminOrOwner,
+  requireOrgMembership,
+  requirePermission("meetings", "view"),
+  getPurgePreviewController,
+);
+router.delete(
+  "/trash/purge",
+  userAuth,
+  writeLimiter,
+  requireAdminOrOwner,
+  requireOrgMembership,
+  requirePermission("meetings", "edit"),
+  purgeTrashController,
+);
 router.post(
   "/:id/restore-deleted",
   userAuth,
@@ -301,6 +453,15 @@ router.get(
   requireOrgAccess(Meeting),
   requirePermission("meetings", "view"),
   getMeetingById,
+);
+
+// ✅ Export Meeting Notes as Markdown (Download button on Meeting Details)
+router.get(
+  "/:id/export",
+  userAuth,
+  requireOrgAccess(Meeting),
+  requirePermission("meetings", "view"),
+  exportMeetingNotes,
 );
 
 // ✅ Update Meeting (for Meeting Details Page - rename)
@@ -457,5 +618,29 @@ router.get(
   requirePermission("meetings", "view"),
   getReactionTimeline,
 );
+
+// ✅ Retrieve organization quiz retention leaderboard
+router.get("/quiz/leaderboard", userAuth, getOrgRetentionLeaderboard);
+
+// ✅ Initiate Meeting Ownership Transfer
+router.post(
+  "/:meetingId/transfers",
+  userAuth,
+  writeLimiter,
+  requireOwner(Meeting),
+  requirePermission("meetings", "edit"),
+  initiateTransfer,
+);
+// ✅ Anonymize / Scrub PII from Meeting
+router.post(
+  "/anonymize",
+  userAuth,
+  writeLimiter,
+  requireAdminOrOwner,
+  anonymizeMeeting,
+);
+
+// ✅ Retrieve unredacted original transcript
+router.get("/:id/raw", userAuth, requireAdminOrOwner, getRawTranscript);
 
 export default router;

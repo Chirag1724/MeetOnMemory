@@ -225,3 +225,422 @@ export const triggerClustering = async (req, res) => {
       .json({ success: false, error: "An internal server error occurred" });
   }
 };
+
+const mergeClustersSchema = z.object({
+  targetClusterId: z
+    .string()
+    .trim()
+    .min(1, "Target cluster ID is required")
+    .refine(isValidId, "Invalid target cluster ID format"),
+});
+
+export const deleteCluster = async (req, res) => {
+  try {
+    const { clusterId } = req.params;
+
+    if (!isValidId(clusterId)) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Invalid cluster ID" });
+    }
+
+    const orgId = req.user.organization;
+    const cluster = await TopicCluster.findOneAndDelete({
+      _id: clusterId,
+      organization: orgId,
+    });
+
+    if (!cluster) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Cluster not found" });
+    }
+
+    // Unset clusterId from any MeetingTopic subdocuments referencing this cluster
+    await MeetingTopic.updateMany(
+      { organization: orgId, "topics.clusterId": clusterId },
+      { $set: { "topics.$[elem].clusterId": null } },
+      { arrayFilters: [{ "elem.clusterId": clusterId }] },
+    );
+
+    res
+      .status(200)
+      .json({ success: true, message: "Cluster deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting cluster:", error);
+    res
+      .status(500)
+      .json({ success: false, error: "An internal server error occurred" });
+  }
+};
+
+export const mergeClusters = async (req, res) => {
+  try {
+    const { clusterId } = req.params;
+
+    if (!isValidId(clusterId)) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Invalid source cluster ID" });
+    }
+
+    const parsed = mergeClustersSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        error: parsed.error.issues[0]?.message || "Validation error",
+      });
+    }
+
+    const { targetClusterId } = parsed.data;
+
+    if (clusterId === targetClusterId) {
+      return res.status(400).json({
+        success: false,
+        error: "Cannot merge a cluster into itself",
+      });
+    }
+
+    const orgId = req.user.organization;
+    const [sourceCluster, targetCluster] = await Promise.all([
+      TopicCluster.findOne({ _id: clusterId, organization: orgId }),
+      TopicCluster.findOne({ _id: targetClusterId, organization: orgId }),
+    ]);
+
+    if (!sourceCluster) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Source cluster not found" });
+    }
+    if (!targetCluster) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Target cluster not found" });
+    }
+
+    // Reassign all topics pointing to sourceCluster to targetCluster
+    await MeetingTopic.updateMany(
+      { organization: orgId, "topics.clusterId": clusterId },
+      { $set: { "topics.$[elem].clusterId": targetCluster._id } },
+      { arrayFilters: [{ "elem.clusterId": clusterId }] },
+    );
+
+    // Re-aggregate topics for targetCluster
+    const meetingTopics = await MeetingTopic.find({
+      organization: orgId,
+      "topics.clusterId": targetCluster._id,
+    });
+
+    const topicsInTarget = [];
+    meetingTopics.forEach((mt) => {
+      mt.topics.forEach((t) => {
+        if (String(t.clusterId) === String(targetCluster._id)) {
+          topicsInTarget.push({
+            name: t.name,
+            embedding: t.embedding,
+            meetingId: mt.meeting?.toString() || mt._id.toString(),
+          });
+        }
+      });
+    });
+
+    const canonicalNames = [
+      ...new Set([
+        ...(targetCluster.canonicalTopicNames || []),
+        ...(sourceCluster.canonicalTopicNames || []),
+        ...topicsInTarget.map((t) => t.name),
+      ]),
+    ].slice(0, 10);
+
+    const uniqueMeetings = new Set(topicsInTarget.map((t) => t.meetingId));
+    targetCluster.canonicalTopicNames = canonicalNames;
+    targetCluster.meetingCount =
+      uniqueMeetings.size ||
+      targetCluster.meetingCount + (sourceCluster.meetingCount || 0);
+
+    // Delete the source cluster
+    await TopicCluster.findByIdAndDelete(clusterId);
+    await targetCluster.save();
+
+    res.status(200).json({ success: true, data: targetCluster });
+  } catch (error) {
+    console.error("Error merging clusters:", error);
+    res
+      .status(500)
+      .json({ success: false, error: "An internal server error occurred" });
+  }
+};
+
+export const extractForOrganization = async (req, res) => {
+  try {
+    if (rejectMismatchedOrgParam(req, res)) return;
+
+    const orgId = req.user.organization;
+    const result = await topicExtractionService.extractAllForOrg(orgId);
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    console.error("Error extracting topics for organization:", error);
+    res
+      .status(500)
+      .json({ success: false, error: "An internal server error occurred" });
+  }
+};
+
+/**
+ * Fetch organization topic trends and semantic velocity analytics (Issue #2425).
+ */
+export const getTopicVelocityAndTrends = async (req, res) => {
+  try {
+    const orgId = req.user.organization;
+
+    // Fetch meeting topics for this organization
+    const meetingTopics = await MeetingTopic.find({ organization: orgId })
+      .populate("meeting", "title date createdAt")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const clusters = await TopicCluster.find({ organization: orgId }).lean();
+
+    const clusterMap = new Map();
+    clusters.forEach((c) => clusterMap.set(String(c._id), c.label));
+
+    // Calculate frequency in recent (last 30 days) vs prior (30-60 days ago)
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+
+    const topicStats = new Map();
+
+    meetingTopics.forEach((mt) => {
+      const meetingDate = mt.meeting?.date
+        ? new Date(mt.meeting.date)
+        : new Date(mt.createdAt);
+      const isRecent = meetingDate >= thirtyDaysAgo;
+      const isPrior =
+        meetingDate >= sixtyDaysAgo && meetingDate < thirtyDaysAgo;
+
+      (mt.topics || []).forEach((t) => {
+        const topicName = (t.name || "").trim();
+        if (!topicName) return;
+
+        const clusterName = t.clusterId
+          ? clusterMap.get(String(t.clusterId)) || "General"
+          : "General";
+
+        if (!topicStats.has(topicName)) {
+          topicStats.set(topicName, {
+            name: topicName,
+            cluster: clusterName,
+            recentCount: 0,
+            priorCount: 0,
+            totalCount: 0,
+            meetings: new Set(),
+          });
+        }
+
+        const stats = topicStats.get(topicName);
+        stats.totalCount += 1;
+        if (isRecent) stats.recentCount += 1;
+        if (isPrior) stats.priorCount += 1;
+        if (mt.meeting?._id) stats.meetings.add(String(mt.meeting._id));
+      });
+    });
+
+    const topicsArray = Array.from(topicStats.values()).map((stat) => {
+      const growth =
+        stat.priorCount === 0
+          ? stat.recentCount > 0
+            ? 100
+            : 0
+          : Math.round(
+              ((stat.recentCount - stat.priorCount) / stat.priorCount) * 100,
+            );
+
+      let velocity = "stable";
+      if (growth > 25) velocity = "accelerating";
+      else if (growth < -25) velocity = "decelerating";
+
+      return {
+        name: stat.name,
+        cluster: stat.cluster,
+        recentCount: stat.recentCount,
+        priorCount: stat.priorCount,
+        totalCount: stat.totalCount,
+        meetingCount: stat.meetings.size,
+        growthPercentage: growth,
+        velocity,
+      };
+    });
+
+    // Sort by total frequency descending
+    topicsArray.sort((a, b) => b.totalCount - a.totalCount);
+
+    const totalTopics = topicsArray.length;
+    const totalMeetings = meetingTopics.length;
+    const acceleratingCount = topicsArray.filter(
+      (t) => t.velocity === "accelerating",
+    ).length;
+    const deceleratingCount = topicsArray.filter(
+      (t) => t.velocity === "decelerating",
+    ).length;
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        topics: topicsArray,
+        metrics: {
+          totalTopics,
+          totalMeetings,
+          acceleratingCount,
+          deceleratingCount,
+          activeClustersCount: clusters.length,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error computing topic velocity:", error);
+    return res
+      .status(500)
+      .json({ success: false, error: "Failed to compute topic velocity" });
+  }
+};
+
+import Decision from "../models/decisionModel.js";
+import ActionItem from "../models/actionItemModel.js";
+
+/**
+ * Fetch cross-meeting topic evolution timeline.
+ */
+export const getTopicEvolutionTimeline = async (req, res) => {
+  try {
+    const orgId = req.user.organization;
+    const { topic = "", startDate, endDate } = req.query;
+
+    const topicQuery = topic.trim().toLowerCase();
+
+    // Fetch meetings with populated topics
+    const meetingTopics = await MeetingTopic.find({ organization: orgId })
+      .populate("meeting", "title date participants duration summary createdAt")
+      .populate("topics.clusterId", "label")
+      .sort({ createdAt: 1 })
+      .lean();
+
+    const decisions = await Decision.find({
+      organization: orgId,
+      status: { $ne: "superseded" },
+    }).lean();
+
+    const actionItems = await ActionItem.find({
+      organization: orgId,
+      status: { $ne: "superseded" },
+    }).lean();
+
+    // Filter meeting topics matching search query
+    const timelineNodes = [];
+    const matchedTopicLabels = new Set();
+
+    meetingTopics.forEach((mt) => {
+      if (!mt.meeting) return;
+
+      const meetingDate = mt.meeting.date
+        ? new Date(mt.meeting.date)
+        : new Date(mt.createdAt);
+
+      if (startDate && new Date(startDate) > meetingDate) return;
+      if (endDate && new Date(endDate) < meetingDate) return;
+
+      const matchingTopics = (mt.topics || []).filter((t) => {
+        if (!topicQuery) return true;
+        const nameMatch = t.name?.toLowerCase().includes(topicQuery);
+        const clusterMatch = t.clusterId?.label
+          ?.toLowerCase()
+          .includes(topicQuery);
+        return nameMatch || clusterMatch;
+      });
+
+      if (matchingTopics.length > 0) {
+        matchingTopics.forEach((t) => {
+          if (t.name) matchedTopicLabels.add(t.name);
+          if (t.clusterId?.label) matchedTopicLabels.add(t.clusterId.label);
+        });
+
+        const meetingIdStr = mt.meeting._id.toString();
+
+        const topicWords = topicQuery.split(" ").filter((w) => w.length > 2);
+        const matchesTopic = (text) => {
+          if (!topicQuery) return true;
+          const lowerText = text.toLowerCase();
+          if (lowerText.includes(topicQuery)) return true;
+          return topicWords.some((w) => lowerText.includes(w));
+        };
+
+        const relatedDecisions = decisions.filter(
+          (d) =>
+            (d.sourceMeetingId?.toString() === meetingIdStr ||
+              d.meetingId?.toString() === meetingIdStr) &&
+            matchesTopic(d.text),
+        );
+
+        const relatedActionItems = actionItems.filter(
+          (a) =>
+            (a.sourceMeetingId?.toString() === meetingIdStr ||
+              a.meetingId?.toString() === meetingIdStr) &&
+            matchesTopic(a.text),
+        );
+
+        timelineNodes.push({
+          meetingId: meetingIdStr,
+          title: mt.meeting.title || "Untitled Meeting",
+          date: meetingDate,
+          participantCount: mt.meeting.participants?.length || 0,
+          topicsDiscussed: matchingTopics.map((t) => ({
+            name: t.name,
+            cluster: t.clusterId?.label || "General",
+          })),
+          decisions: relatedDecisions.map((d) => ({
+            id: d._id.toString(),
+            text: d.text,
+          })),
+          actionItems: relatedActionItems.map((a) => ({
+            id: a._id.toString(),
+            text: a.text,
+            assignee: a.assigneeName || a.owner || "Unassigned",
+          })),
+          sentiment:
+            matchingTopics.length > 2 ? "positive font-bold" : "neutral",
+        });
+      }
+    });
+
+    timelineNodes.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    const totalDecisionsCount = timelineNodes.reduce(
+      (sum, node) => sum + node.decisions.length,
+      0,
+    );
+    const totalActionItemsCount = timelineNodes.reduce(
+      (sum, node) => sum + node.actionItems.length,
+      0,
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        queryTopic: topic,
+        availableTopics: Array.from(matchedTopicLabels).slice(0, 20),
+        timeline: timelineNodes,
+        metrics: {
+          totalMeetings: timelineNodes.length,
+          totalDecisionsCount,
+          totalActionItemsCount,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching topic evolution timeline:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to compute topic evolution timeline",
+    });
+  }
+};

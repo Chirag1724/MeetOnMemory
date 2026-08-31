@@ -1,9 +1,12 @@
+import { z } from "zod";
+import mongoose from "mongoose";
 import ActionItem from "../models/actionItemModel.js";
 import ActionItemExtractor from "../services/actionItemExtractor.js";
 import { syncActionItemToGitHub } from "../services/githubSyncService.js";
 import { syncActionItemToJira } from "../services/jiraSyncService.js";
 import { syncActionItemToLinear } from "../services/linearSyncService.js";
 import eventBus from "../services/eventBus.js";
+import ActionItemChangeLog from "../models/actionItemChangeLogModel.js";
 
 /**
  * @desc Trigger AI extraction from meeting transcript (Idempotent)
@@ -97,13 +100,140 @@ export const extractFromMeeting = async (req, res) => {
 };
 
 /**
+ * @desc Create a manual action item for a meeting
+ * @route POST /api/action-items
+ * @access Private
+ */
+const createActionItemSchema = z
+  .object({
+    text: z
+      .string()
+      .trim()
+      .min(1, "Action item text is required")
+      .max(2000)
+      .optional(),
+    title: z
+      .string()
+      .trim()
+      .min(1, "Action item title is required")
+      .max(2000)
+      .optional(),
+    description: z.string().trim().max(2000).optional(),
+    assignee: z.string().trim().optional().nullable(),
+    status: z
+      .enum([
+        "open",
+        "in-progress",
+        "resolved",
+        "superseded",
+        "pending",
+        "in_progress",
+        "completed",
+        "overdue",
+        "cancelled",
+      ])
+      .optional(),
+    priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
+    dueDate: z.union([z.string(), z.date()]).optional().nullable(),
+    deadline: z.union([z.string(), z.date()]).optional().nullable(),
+    sourceContext: z.string().max(5000).optional(),
+    remindersEnabled: z.boolean().optional(),
+  })
+  .refine((data) => data.text || data.title, {
+    message: "Action item text is required",
+    path: ["text"],
+  });
+
+export const createActionItem = async (req, res) => {
+  try {
+    const { meetingId } = req.params;
+    const parsed = createActionItemSchema.safeParse(req.body);
+
+    if (!mongoose.isValidObjectId(meetingId)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid meeting ID",
+      });
+    }
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        error: "Validation error",
+        errors: parsed.error.issues,
+      });
+    }
+
+    const data = parsed.data;
+    const text = data.text || data.title;
+    const dueDate = data.dueDate ?? data.deadline ?? null;
+
+    if (dueDate !== null && Number.isNaN(new Date(dueDate).getTime())) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid due date",
+      });
+    }
+
+    if (data.assignee && !mongoose.isValidObjectId(data.assignee)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid assignee ID",
+      });
+    }
+
+    const item = await ActionItem.create({
+      text,
+      description: data.description || "",
+      assignee: data.assignee || null,
+      assignedBy: req.user._id || req.user.id,
+      status: data.status || "open",
+      priority: data.priority || "medium",
+      sourceMeetingId: meetingId,
+      organization:
+        req.meeting.organization ||
+        req.meeting.organizationId ||
+        req.user.organization ||
+        req.user.organizationId ||
+        null,
+      dueDate,
+      sourceContext: data.sourceContext || "",
+      remindersEnabled: data.remindersEnabled ?? true,
+    });
+
+    const populatedItem = await ActionItem.findById(item._id)
+      .populate("assignee", "name avatar")
+      .populate("assignedBy", "name")
+      .populate("sourceMeetingId", "title date");
+
+    return res.status(201).json({
+      success: true,
+      data: populatedItem || item,
+    });
+  } catch (error) {
+    if (error?.name === "ValidationError" || error?.name === "CastError") {
+      return res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+
+    console.error("Error creating action item:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Server error",
+    });
+  }
+};
+
+/**
  * @desc Get action items for the current user
  */
 export const getActionItems = async (req, res) => {
   try {
     const { status, priority, meetingId } = req.query;
-    const userId = req.user.id;
-    const orgId = req.user.organizationId;
+    const userId = req.user._id || req.user.id;
+    const orgId = req.user.organization || req.user.organizationId;
 
     const filter = {
       $or: [{ assignee: userId }, { assignedBy: userId }],
@@ -163,11 +293,17 @@ export const updateActionItem = async (req, res) => {
       "title",
       "text",
       "description",
+      "snoozedUntil",
+      "customWarningOffsets",
     ];
     const updates = {};
     allowedFields.forEach((field) => {
       if (req.body[field] !== undefined) updates[field] = req.body[field];
     });
+
+    if (updates.customWarningOffsets !== undefined) {
+      updates.warningsSent = [];
+    }
 
     if (updates.title && !updates.text) {
       updates.text = updates.title;
@@ -203,10 +339,106 @@ export const updateActionItem = async (req, res) => {
       runValidators: true,
     }).populate("assignee", "name avatar");
 
+    // --- Audit log for snooze / alert options ---
+    try {
+      const AuditService = (await import("../services/AuditService.js"))
+        .default;
+      const actingUserId = req.user._id || req.user.id;
+      const orgId =
+        item.organization || req.user.organization || req.user.organizationId;
+
+      if (updates.snoozedUntil !== undefined) {
+        const isSnoozed = updates.snoozedUntil !== null;
+        await AuditService.logAction({
+          actorId: actingUserId,
+          action: isSnoozed ? "ACTION_ITEM_SNOOZED" : "ACTION_ITEM_UNSNOOZED",
+          entity: "ActionItem",
+          entityId: id,
+          organizationId: orgId,
+          details: {
+            snoozedUntil: updates.snoozedUntil,
+            previousSnoozedUntil: item.snoozedUntil,
+          },
+        });
+      }
+
+      if (updates.customWarningOffsets !== undefined) {
+        await AuditService.logAction({
+          actorId: actingUserId,
+          action: "ACTION_ITEM_ALERT_OPTIONS_UPDATED",
+          entity: "ActionItem",
+          entityId: id,
+          organizationId: orgId,
+          details: {
+            customWarningOffsets: updates.customWarningOffsets,
+            previousWarningOffsets: item.customWarningOffsets,
+          },
+        });
+      }
+    } catch (auditErr) {
+      console.error(
+        "Audit log failed for action item snooze/alerts:",
+        auditErr,
+      );
+    }
+
+    // --- Changelog Tracking ---
+    try {
+      const changelogEntries = [];
+      const fieldsToTrack = [
+        "status",
+        "assignee",
+        "dueDate",
+        "priority",
+        "title",
+        "text",
+        "description",
+      ];
+      const actingUserId = req.user._id || req.user.id;
+
+      fieldsToTrack.forEach((field) => {
+        let oldValue = item[field];
+        let newValue = updatedItem[field];
+
+        if (field === "assignee") {
+          oldValue = item.assignee?._id
+            ? item.assignee._id.toString()
+            : item.assignee
+              ? item.assignee.toString()
+              : null;
+          newValue = updatedItem.assignee?._id
+            ? updatedItem.assignee._id.toString()
+            : updatedItem.assignee
+              ? updatedItem.assignee.toString()
+              : null;
+        } else if (field === "dueDate") {
+          oldValue = oldValue ? new Date(oldValue).toISOString() : null;
+          newValue = newValue ? new Date(newValue).toISOString() : null;
+        }
+
+        if (oldValue !== newValue) {
+          changelogEntries.push({
+            actionItemId: updatedItem._id,
+            changedBy: actingUserId,
+            changeType: field,
+            oldValue,
+            newValue,
+          });
+        }
+      });
+
+      if (changelogEntries.length > 0) {
+        await ActionItemChangeLog.insertMany(changelogEntries);
+      }
+    } catch (changelogErr) {
+      console.error("Failed to create action item changelog", changelogErr);
+    }
+    // -------------------------
+
     if (["completed", "resolved"].includes(updates.status)) {
       eventBus.emit("actionItem.completed", {
         userId: updatedItem.assignee?._id || req.user.id,
-        organizationId: req.user.organizationId,
+        organizationId: req.user.organization || req.user.organizationId,
         actionItemId: updatedItem._id,
       });
     }

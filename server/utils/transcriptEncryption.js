@@ -18,6 +18,32 @@ export const isE2eeEnabled = () => {
 };
 
 /**
+ * Check if E2EE is enabled for a given organization or globally (Issue #2263).
+ */
+export const isOrgE2eeEnabled = (organization) => {
+  if (organization) {
+    const e2ee = organization.e2eeSettings || organization;
+    if (typeof e2ee?.enabled === "boolean") {
+      return e2ee.enabled;
+    }
+  }
+  return isE2eeEnabled();
+};
+
+/**
+ * Check if E2EE is enforced org-wide for all meetings in an organization (Issue #2263).
+ */
+export const isOrgE2eeEnforced = (organization) => {
+  if (organization) {
+    const e2ee = organization.e2eeSettings || organization;
+    if (typeof e2ee?.enforceOrgWide === "boolean") {
+      return e2ee.enforceOrgWide && isOrgE2eeEnabled(organization);
+    }
+  }
+  return false;
+};
+
+/**
  * Valid ciphertext envelope from the client.
  */
 export const isEncryptedTranscriptPayload = (value) => {
@@ -69,3 +95,23 @@ export const isMeetingTranscriptEncrypted = (meeting) =>
  */
 export const meetingSupportsServerAi = (meeting) =>
   !isMeetingTranscriptEncrypted(meeting);
+
+/**
+ * Check if the organization associated with the meeting enforces E2EE.
+ */
+export const isOrgE2eeEnforcedForMeeting = async (meeting) => {
+  if (!meeting || !meeting.organization) return false;
+
+  let org = meeting.organization;
+  if (typeof org === "string" || org.constructor?.name === "ObjectId") {
+    try {
+      const Organization = (await import("../models/organizationModel.js"))
+        .default;
+      org = await Organization.findById(org).lean();
+    } catch {
+      return false;
+    }
+  }
+
+  return isOrgE2eeEnforced(org);
+};

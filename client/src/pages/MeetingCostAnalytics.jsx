@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
   BarChart,
@@ -15,6 +16,7 @@ import {
 } from "recharts";
 import {
   BarChart3,
+  Calculator,
   Clock3,
   Download,
   Loader2,
@@ -77,8 +79,12 @@ const MeetingCostAnalytics = () => {
       }
     } catch (err) {
       console.error("Error fetching cost data:", err);
-      setError("We could not load meeting cost analytics. Please try again.");
-      toast.error("Failed to load analytics");
+      const errMsg =
+        err.response?.data?.message ||
+        err.message ||
+        "We could not load meeting cost analytics. Please try again.";
+      setError(errMsg);
+      toast.error(err.response?.data?.message || "Failed to load analytics");
     } finally {
       setLoading(false);
     }
@@ -107,7 +113,9 @@ const MeetingCostAnalytics = () => {
       toast.success("Export downloaded");
     } catch (err) {
       console.error("Error exporting data:", err);
-      toast.error("Export failed");
+      toast.error(
+        err.response?.data?.message || err.message || "Export failed",
+      );
     } finally {
       setExporting(false);
     }
@@ -243,6 +251,13 @@ const MeetingCostAnalytics = () => {
               />
               Refresh
             </button>
+            <Link
+              to="/meeting-cost-calculator"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 transition-colors"
+            >
+              <Calculator className="h-4 w-4" aria-hidden="true" />
+              Cost Calculator
+            </Link>
             <button
               type="button"
               onClick={handleExport}

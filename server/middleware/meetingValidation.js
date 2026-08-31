@@ -84,6 +84,14 @@ export const createMeetingSchema = z
       .default(null),
     location: textField(500, "Meeting location").optional().default(""),
     venue: textField(1000, "Meeting venue").optional().default(""),
+    venueCoordinates: z
+      .object({
+        lat: z.number().finite().nullable().optional(),
+        lng: z.number().finite().nullable().optional(),
+      })
+      .nullable()
+      .optional()
+      .default(null),
     participants: z
       .array(participantSchema)
       .max(500, "A meeting cannot have more than 500 participants")
@@ -112,6 +120,8 @@ export const createMeetingSchema = z
       .optional(),
     recordingType: z.enum(["upload", "live"]).optional().default("upload"),
     syncToCalendar: z.boolean().optional().default(false),
+    auditNote: z.string().optional().default(""),
+    tags: z.array(z.string().trim().max(100)).optional().default([]),
   })
   .strict();
 

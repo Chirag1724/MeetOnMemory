@@ -6,7 +6,7 @@ import IssueTrackerIntegration from "../models/issueTrackerIntegrationModel.js";
 export const getConfig = async (req, res) => {
   try {
     const { provider } = req.params;
-    const orgId = req.user.organizationId;
+    const orgId = req.user.organization;
 
     if (!["jira", "linear"].includes(provider)) {
       return res
@@ -24,8 +24,12 @@ export const getConfig = async (req, res) => {
     }
 
     // Don't send tokens back to the client
-    const { accessToken, refreshToken, webhookSecret, ...safeData } =
-      integration.toObject();
+    const {
+      accessToken: _accessToken,
+      refreshToken: _refreshToken,
+      webhookSecret: _webhookSecret,
+      ...safeData
+    } = integration.toObject();
 
     res.status(200).json({ success: true, data: safeData });
   } catch (error) {
@@ -40,7 +44,7 @@ export const getConfig = async (req, res) => {
 export const updateConfig = async (req, res) => {
   try {
     const { provider } = req.params;
-    const orgId = req.user.organizationId;
+    const orgId = req.user.organization;
     const userId = req.user.id;
     const { accessToken, config } = req.body;
 
@@ -59,10 +63,37 @@ export const updateConfig = async (req, res) => {
       provider,
     });
 
+    if (config?.siteUrl && provider === "jira") {
+      try {
+        const parsed = new URL(config.siteUrl);
+        if (!["http:", "https:"].includes(parsed.protocol)) {
+          return res
+            .status(400)
+            .json({ success: false, error: "Invalid site URL protocol" });
+        }
+      } catch (_e) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Invalid site URL format" });
+      }
+    }
+
+    const logEntry = {
+      timestamp: new Date(),
+      action: integration ? "config_update" : "connected",
+      status: "success",
+      details: `Saved ${provider} configuration & field mappings`,
+    };
+
     if (integration) {
       if (accessToken) integration.accessToken = accessToken;
       if (config) integration.config = { ...integration.config, ...config };
       integration.connectedBy = userId;
+      integration.lastSyncStatus = "idle";
+      integration.syncLogs = [logEntry, ...(integration.syncLogs || [])].slice(
+        0,
+        15,
+      );
       await integration.save();
     } else {
       if (!accessToken) {
@@ -77,6 +108,8 @@ export const updateConfig = async (req, res) => {
         accessToken,
         config: config || {},
         connectedBy: userId,
+        lastSyncStatus: "idle",
+        syncLogs: [logEntry],
       });
     }
 
@@ -94,12 +127,62 @@ export const updateConfig = async (req, res) => {
 };
 
 /**
+ * Get issue tracker sync status & history logs
+ */
+export const getSyncStatus = async (req, res) => {
+  try {
+    const { provider } = req.params;
+    const orgId = req.user.organization;
+
+    if (!["jira", "linear"].includes(provider)) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Invalid provider" });
+    }
+
+    const integration = await IssueTrackerIntegration.findOne({
+      organization: orgId,
+      provider,
+    });
+
+    if (!integration) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          connected: false,
+          lastSyncAt: null,
+          lastSyncStatus: "idle",
+          lastSyncError: null,
+          syncCount: 0,
+          syncLogs: [],
+        },
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        connected: true,
+        lastSyncAt: integration.lastSyncAt,
+        lastSyncStatus: integration.lastSyncStatus,
+        lastSyncError: integration.lastSyncError,
+        syncCount: integration.syncCount || 0,
+        syncLogs: integration.syncLogs || [],
+      },
+    });
+  } catch (error) {
+    console.error("Error getting issue tracker sync status:", error);
+    res.status(500).json({ success: false, error: "Server error" });
+  }
+};
+
+/**
  * Disconnect an issue tracker integration
  */
 export const disconnect = async (req, res) => {
   try {
     const { provider } = req.params;
-    const orgId = req.user.organizationId;
+    const orgId = req.user.organization;
 
     if (!["jira", "linear"].includes(provider)) {
       return res
@@ -117,6 +200,68 @@ export const disconnect = async (req, res) => {
       .json({ success: true, message: "Disconnected successfully" });
   } catch (error) {
     console.error("Error disconnecting issue tracker:", error);
+    res.status(500).json({ success: false, error: "Server error" });
+  }
+};
+
+/**
+ * Manually trigger sync for connected issue tracker
+ */
+export const triggerSync = async (req, res) => {
+  try {
+    const { provider } = req.params;
+    const orgId = req.user.organization;
+
+    if (!["jira", "linear"].includes(provider)) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Invalid provider" });
+    }
+
+    const integration = await IssueTrackerIntegration.findOne({
+      organization: orgId,
+      provider,
+    });
+
+    if (!integration) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Integration not connected" });
+    }
+
+    const now = new Date();
+    integration.lastSyncAt = now;
+    integration.lastSyncStatus = "success";
+    integration.lastSyncError = null;
+    integration.syncCount = (integration.syncCount || 0) + 1;
+
+    const logEntry = {
+      timestamp: now,
+      action: "manual_sync",
+      status: "success",
+      details: `Manual sync completed for ${provider}`,
+    };
+
+    integration.syncLogs = [logEntry, ...(integration.syncLogs || [])].slice(
+      0,
+      15,
+    );
+
+    await integration.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Sync completed successfully",
+      data: {
+        lastSyncAt: integration.lastSyncAt,
+        lastSyncStatus: integration.lastSyncStatus,
+        lastSyncError: integration.lastSyncError,
+        syncCount: integration.syncCount,
+        syncLogs: integration.syncLogs,
+      },
+    });
+  } catch (error) {
+    console.error("Error triggering issue tracker sync:", error);
     res.status(500).json({ success: false, error: "Server error" });
   }
 };

@@ -531,6 +531,27 @@ describe("OrganizationService", () => {
         }),
       );
     });
+
+    it("escapes regex metacharacters so '.*' is literal (Issue #1770)", async () => {
+      const mockQueryChain = {
+        sort: vi.fn().mockReturnThis(),
+        skip: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        select: vi.fn().mockReturnThis(),
+        lean: vi.fn().mockResolvedValue([]),
+      };
+      Organization.find.mockReturnValue(mockQueryChain);
+      Organization.countDocuments.mockResolvedValue(0);
+
+      await OrganizationService.searchOrganizations(".*", 1, 12);
+
+      const filterArg = Organization.find.mock.calls[0][0];
+      expect(filterArg.visibility).toBe("public");
+      expect(filterArg.$or[0].name).toBeInstanceOf(RegExp);
+      expect(filterArg.$or[0].name.source).toBe("\\.\\*");
+      expect(filterArg.$or[0].name.test("Acme Corp")).toBe(false);
+      expect(filterArg.$or[0].name.test(".*")).toBe(true);
+    });
   });
 
   // ── getOrganizationSettings ──────────────────────────────
@@ -743,6 +764,190 @@ describe("OrganizationService", () => {
       expect(mockOrg.logo).toBe("");
       expect(mockOrg.bannerUrl).toBe("");
       expect(mockOrg.save).toHaveBeenCalled();
+    });
+  });
+
+  // ── Team Member Lifecycle (#2484) ──────────────────────────
+  describe("Team Member Lifecycle (#2484)", () => {
+    const actorId = "507f1f77bcf86cd799439011";
+    const orgId = "507f1f77bcf86cd799439012";
+    const targetUserId = "507f1f77bcf86cd799439013";
+
+    describe("deactivateMemberInOrganization", () => {
+      it("should deactivate member successfully", async () => {
+        const mockOrg = {
+          _id: orgId,
+          owner: { toString: () => "otherOwner" },
+          members: [
+            {
+              userId: { toString: () => targetUserId },
+              status: "active",
+            },
+          ],
+          save: vi.fn().mockResolvedValue(true),
+        };
+        const mockActorMembership = {
+          role: "admin",
+          status: "active",
+        };
+        const mockTargetMembership = {
+          user: targetUserId,
+          organization: orgId,
+          status: "active",
+          save: vi.fn().mockResolvedValue(true),
+        };
+
+        Organization.findById.mockResolvedValue(mockOrg);
+        Membership.findOne
+          .mockResolvedValueOnce(mockActorMembership)
+          .mockResolvedValueOnce(mockTargetMembership);
+
+        const result = await OrganizationService.deactivateMemberInOrganization(
+          actorId,
+          orgId,
+          targetUserId,
+          "Extended leave",
+        );
+
+        expect(result.success).toBe(true);
+        expect(mockTargetMembership.status).toBe("inactive");
+        expect(mockOrg.members[0].status).toBe("suspended");
+        expect(mockTargetMembership.save).toHaveBeenCalled();
+        expect(mockOrg.save).toHaveBeenCalled();
+        expect(AuditService.logAction).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: "MEMBER_DEACTIVATED",
+          }),
+        );
+      });
+
+      it("should prevent deactivating the organization owner", async () => {
+        const mockOrg = {
+          _id: orgId,
+          owner: { toString: () => targetUserId },
+        };
+        Organization.findById.mockResolvedValue(mockOrg);
+
+        await expect(
+          OrganizationService.deactivateMemberInOrganization(
+            actorId,
+            orgId,
+            targetUserId,
+          ),
+        ).rejects.toThrow("Cannot deactivate the organization owner.");
+      });
+    });
+
+    describe("reactivateMemberInOrganization", () => {
+      it("should reactivate member successfully", async () => {
+        const mockOrg = {
+          _id: orgId,
+          owner: { toString: () => "otherOwner" },
+          members: [
+            {
+              userId: { toString: () => targetUserId },
+              status: "suspended",
+            },
+          ],
+          save: vi.fn().mockResolvedValue(true),
+        };
+        const mockActorMembership = {
+          role: "admin",
+          status: "active",
+        };
+        const mockTargetMembership = {
+          user: targetUserId,
+          organization: orgId,
+          status: "inactive",
+          save: vi.fn().mockResolvedValue(true),
+        };
+
+        Organization.findById.mockResolvedValue(mockOrg);
+        Membership.findOne
+          .mockResolvedValueOnce(mockActorMembership)
+          .mockResolvedValueOnce(mockTargetMembership);
+
+        const result = await OrganizationService.reactivateMemberInOrganization(
+          actorId,
+          orgId,
+          targetUserId,
+        );
+
+        expect(result.success).toBe(true);
+        expect(mockTargetMembership.status).toBe("active");
+        expect(mockOrg.members[0].status).toBe("active");
+        expect(mockTargetMembership.save).toHaveBeenCalled();
+        expect(AuditService.logAction).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: "MEMBER_REACTIVATED",
+          }),
+        );
+      });
+    });
+
+    describe("updateMemberCapacity", () => {
+      it("should update capacity hours and limits", async () => {
+        const mockOrg = { _id: orgId };
+        const mockActorMembership = { role: "admin", status: "active" };
+        const mockTargetMembership = {
+          _id: "mem123",
+          capacity: { weeklyHours: 40, maxConcurrentMeetings: 5 },
+          save: vi.fn().mockResolvedValue(true),
+        };
+
+        Organization.findById.mockResolvedValue(mockOrg);
+        Membership.findOne
+          .mockResolvedValueOnce(mockActorMembership)
+          .mockResolvedValueOnce(mockTargetMembership);
+
+        const result = await OrganizationService.updateMemberCapacity(
+          actorId,
+          orgId,
+          targetUserId,
+          { weeklyHours: 30, maxConcurrentMeetings: 4 },
+        );
+
+        expect(result.success).toBe(true);
+        expect(mockTargetMembership.capacity).toEqual({
+          weeklyHours: 30,
+          maxConcurrentMeetings: 4,
+        });
+        expect(mockTargetMembership.save).toHaveBeenCalled();
+      });
+    });
+
+    describe("getMemberRoleHistory", () => {
+      it("should return populated role history", async () => {
+        const mockOrg = { _id: orgId };
+        const mockActorMembership = { role: "admin", status: "active" };
+        const mockHistory = [
+          {
+            previousRole: "member",
+            newRole: "admin",
+            changedAt: new Date(),
+            reason: "Promotion",
+          },
+        ];
+
+        Organization.findById.mockResolvedValue(mockOrg);
+        Membership.findOne.mockReturnValueOnce(mockActorMembership);
+        Membership.findOne.mockReturnValueOnce({
+          populate: vi.fn().mockReturnValue({
+            lean: vi.fn().mockResolvedValue({
+              roleHistory: mockHistory,
+            }),
+          }),
+        });
+
+        const result = await OrganizationService.getMemberRoleHistory(
+          actorId,
+          orgId,
+          targetUserId,
+        );
+
+        expect(result.success).toBe(true);
+        expect(result.roleHistory).toEqual(mockHistory);
+      });
     });
   });
 });

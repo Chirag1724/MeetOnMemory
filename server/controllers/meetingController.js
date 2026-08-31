@@ -15,12 +15,21 @@
 import fs from "fs";
 import path from "path";
 import { z } from "zod";
-import Meeting from "../models/meetingModel.js"; // eslint-disable-line no-unused-vars
+import mongoose from "mongoose";
+import Meeting from "../models/meetingModel.js";
+import ActionItem from "../models/actionItemModel.js";
+import { renderMeetingNotesMarkdown } from "../utils/meetingNotesExport.js";
 import * as MeetingService from "../services/MeetingService.js";
 import * as MeetingInviteService from "../services/MeetingInviteService.js";
+import * as MeetingCloneService from "../services/meetingCloneService.js";
 import { ValidationError, UnauthorizedError } from "../utils/errors.js";
 import AuditService from "../services/AuditService.js";
 import { sendSuccess } from "../utils/responseHandler.js";
+import {
+  encryptText,
+  decryptText,
+  redactTextAndAudit,
+} from "../services/dataRedactionService.js";
 
 const pushMeetingToIntegrations = (...args) =>
   import("../services/calendarSyncService.js").then((mod) =>
@@ -42,10 +51,18 @@ const createMeetingSchema = z.object({
   duration: z.number().nullable().optional(),
   location: z.string().optional().default(""),
   venue: z.string().optional().default(""),
+  venueCoordinates: z
+    .object({
+      lat: z.number().finite().nullable().optional(),
+      lng: z.number().finite().nullable().optional(),
+    })
+    .nullable()
+    .optional(),
   participants: z.array(z.record(z.unknown())).optional().default([]),
   agendaItems: z.array(z.record(z.unknown())).optional().default([]),
   policyDetails: z.record(z.unknown()).nullable().optional(),
   recordingType: z.enum(["upload", "live"]).optional().default("upload"),
+  auditNote: z.string().optional().default(""),
 });
 
 const uploadMeetingSchema = z.object({
@@ -61,6 +78,7 @@ const summarizeMeetingSchema = z.object({
   transcript: z.string().optional(),
   date: z.string({ required_error: "Meeting date is required." }),
   title: z.string().optional(),
+  templateId: z.string().optional(),
 });
 
 const updateMeetingSchema = z.object({
@@ -74,6 +92,13 @@ const updateMeetingSchema = z.object({
   duration: z.number().nullable().optional(),
   location: z.string().optional(),
   venue: z.string().optional(),
+  venueCoordinates: z
+    .object({
+      lat: z.number().finite().nullable().optional(),
+      lng: z.number().finite().nullable().optional(),
+    })
+    .nullable()
+    .optional(),
   tags: z.array(z.string()).optional(),
   agendaItems: z.array(z.record(z.unknown())).optional(),
 });
@@ -381,6 +406,7 @@ export const summarizeMeeting = async (req, res, next) => {
       validated.transcript || "",
       validated.date,
       validated.title || null,
+      validated.templateId || null,
     );
 
     if (result.queued) {
@@ -530,6 +556,42 @@ export const getMeetingById = async (req, res, next) => {
     getUserId(req); // ensure authenticated
     const meeting = await MeetingService.getMeetingById(req.params.id);
     return sendSuccess(res, { meeting });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/* ─────────────────────────────────────────────────────────────
+   EXPORT MEETING NOTES (Markdown) — Issue #2543
+   Lets users download a shareable Markdown file of the summary and
+   action items for stakeholders who lack platform access.
+   ───────────────────────────────────────────────────────────── */
+export const exportMeetingNotes = async (req, res, next) => {
+  try {
+    getUserId(req); // ensure authenticated
+    const meeting = await MeetingService.getMeetingById(req.params.id);
+
+    const actionItems = await ActionItem.find({
+      sourceMeetingId: req.params.id,
+    })
+      .sort({ createdAt: 1 })
+      .lean();
+
+    const markdown = renderMeetingNotesMarkdown(meeting, actionItems, {
+      includeTranscript: req.query.transcript === "true",
+    });
+
+    const safeTitle = (meeting?.title || "meeting")
+      .replace(/[^a-z0-9]+/gi, "-")
+      .replace(/^-+|-+$/g, "")
+      .toLowerCase();
+
+    res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${safeTitle || "meeting"}-notes.md"`,
+    );
+    return res.status(200).send(markdown);
   } catch (err) {
     next(err);
   }
@@ -745,5 +807,236 @@ export const getMeetingClip = async (req, res) => {
     res
       .status(500)
       .json({ success: false, message: "Server error fetching clip" });
+  }
+};
+
+export const getPurgePreviewController = async (req, res, next) => {
+  try {
+    const preview = await MeetingService.getPurgePreview(req.user.organization);
+    return sendSuccess(res, preview);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const purgeTrashController = async (req, res, next) => {
+  try {
+    const actorId = getUserId(req);
+    const result = await MeetingService.purgeTrash(req.user.organization);
+
+    await AuditService.logAction({
+      actorId,
+      action: "RECYCLE_BIN_PURGED",
+      entity: "Meeting",
+      organizationId: req.user.organization,
+      details: { deletedCount: result.deletedCount },
+    });
+
+    return sendSuccess(res, result, "Recycle bin purged successfully");
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const anonymizeMeeting = async (req, res, next) => {
+  try {
+    const meetingId = req.body.meetingId || req.params.id || req.body.id;
+    if (!meetingId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "meetingId is required" });
+    }
+    const meeting = await Meeting.findById(meetingId);
+    if (!meeting) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Meeting not found" });
+    }
+
+    // Ensure tenant isolation
+    if (
+      meeting.organization &&
+      req.user.organization &&
+      meeting.organization.toString() !== req.user.organization.toString()
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden: Access denied to this organization",
+      });
+    }
+
+    // User must be Owner or Admin
+    if (req.user.role !== "owner" && req.user.role !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden: Owner or Admin role required",
+      });
+    }
+
+    if (meeting.isRedacted) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Meeting is already redacted" });
+    }
+
+    const orgId = meeting.organization || req.user.organization;
+
+    // 1. Fetch transcript segments
+    const Transcript = mongoose.model("Transcript");
+    const transcriptDoc = await Transcript.findOne({ meeting: meeting._id });
+
+    // Store original values
+    const origTranscript = meeting.transcript || "";
+    const origSummary = meeting.summary || "";
+    const origAiNotes = meeting.aiNotes || "";
+    let origSegmentsStr = "";
+    if (transcriptDoc && transcriptDoc.segments) {
+      origSegmentsStr = JSON.stringify(transcriptDoc.segments);
+    }
+
+    // 2. Perform redaction
+    const rTranscript = await redactTextAndAudit(
+      origTranscript,
+      meeting._id,
+      orgId,
+    );
+    const rSummary = await redactTextAndAudit(origSummary, meeting._id, orgId);
+    const rAiNotes = await redactTextAndAudit(origAiNotes, meeting._id, orgId);
+
+    // 3. Encrypt original strings using AES-256
+    meeting.encryptedOriginals = {
+      transcript: encryptText(origTranscript),
+      summary: encryptText(origSummary),
+      aiNotes: encryptText(origAiNotes),
+      transcriptSegments: origSegmentsStr ? encryptText(origSegmentsStr) : "",
+    };
+
+    // Update public text fields with redacted contents
+    meeting.transcript = rTranscript.redactedText;
+    meeting.summary = rSummary.redactedText;
+    meeting.aiNotes = rAiNotes.redactedText;
+    meeting.isRedacted = true;
+
+    await meeting.save();
+
+    // 4. Also redact separate Transcript document segments and fullText
+    if (transcriptDoc) {
+      if (transcriptDoc.segments) {
+        for (const seg of transcriptDoc.segments) {
+          const rSeg = await redactTextAndAudit(seg.text, meeting._id, orgId);
+          seg.text = rSeg.redactedText;
+        }
+      }
+      if (transcriptDoc.fullText) {
+        const rFull = await redactTextAndAudit(
+          transcriptDoc.fullText,
+          meeting._id,
+          orgId,
+        );
+        transcriptDoc.fullText = rFull.redactedText;
+      }
+      await transcriptDoc.save();
+    }
+
+    return sendSuccess(
+      res,
+      { meeting },
+      "Meeting anonymized and PII redacted successfully",
+    );
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getRawTranscript = async (req, res, next) => {
+  try {
+    const meetingId = req.params.id || req.query.meetingId;
+    if (!meetingId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "meeting ID is required" });
+    }
+    const meeting = await Meeting.findById(meetingId);
+    if (!meeting) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Meeting not found" });
+    }
+
+    // Ensure tenant isolation
+    if (
+      meeting.organization &&
+      req.user.organization &&
+      meeting.organization.toString() !== req.user.organization.toString()
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden: Access denied to this organization",
+      });
+    }
+
+    // User must be Owner or Admin
+    if (req.user.role !== "owner" && req.user.role !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden: Owner or Admin role required",
+      });
+    }
+
+    if (!meeting.isRedacted || !meeting.encryptedOriginals) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Meeting is not redacted" });
+    }
+
+    // Decrypt original contents
+    const original = {
+      transcript: decryptText(meeting.encryptedOriginals.transcript),
+      summary: decryptText(meeting.encryptedOriginals.summary),
+      aiNotes: decryptText(meeting.encryptedOriginals.aiNotes),
+      transcriptSegments: meeting.encryptedOriginals.transcriptSegments
+        ? decryptText(meeting.encryptedOriginals.transcriptSegments)
+        : "",
+    };
+
+    return sendSuccess(
+      res,
+      { original },
+      "Original unredacted contents decrypted successfully",
+    );
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const cloneMeeting = async (req, res, next) => {
+  try {
+    const meetingId = req.params.meetingId;
+    const userId = req.user._id;
+
+    const options = {
+      includeAgenda: req.body.includeAgenda !== false,
+      includeParticipants: req.body.includeParticipants !== false,
+      includeCustomFields: req.body.includeCustomFields !== false,
+    };
+
+    if (req.body.newDate) {
+      options.newDate = new Date(req.body.newDate);
+    }
+
+    const newMeeting = await MeetingCloneService.cloneMeeting(
+      meetingId,
+      userId,
+      options,
+    );
+
+    return sendSuccess(
+      res,
+      { meeting: newMeeting },
+      "Meeting cloned successfully",
+      201,
+    );
+  } catch (err) {
+    next(err);
   }
 };

@@ -20,6 +20,8 @@ export const knowledgeApi = {
   },
   updateActionItemStatus: (id, status) =>
     apiClient.patch(`/api/knowledge/action-items/${id}`, { status }),
+  updateActionItem: (id, updates) =>
+    apiClient.patch(`/api/action-items/${id}`, updates),
   toggleActionItemReminder: (id, enabled) =>
     apiClient.patch(`/api/knowledge/action-items/${id}/reminders`, { enabled }),
   getDecisions: (sortBy = "createdAt", status, options = {}) => {
@@ -33,19 +35,26 @@ export const knowledgeApi = {
     return apiClient.get(url);
   },
   /**
-   * Unified archived decisions + action items with correct combined pagination (#901).
+   * Unified archived decisions + action items with correct combined pagination
+   * and server-side tag facets (#2072).
    */
   getArchivedMemories: (options = {}) => {
     const params = new URLSearchParams();
     if (options.type) params.append("type", options.type);
     if (options.search) params.append("search", options.search);
+    if (options.tag && options.tag !== "all") params.append("tag", options.tag);
     if (options.page) params.append("page", String(options.page));
     if (options.limit) params.append("limit", String(options.limit));
     const query = params.toString();
     return apiClient.get(`/api/knowledge/archive${query ? `?${query}` : ""}`);
   },
+  bulkRestoreArchivedMemories: (items, reason) =>
+    apiClient.post("/api/knowledge/archive/restore", {
+      items,
+      ...(reason?.trim() ? { reason: reason.trim() } : {}),
+    }),
   /**
-   * Unified Memory Lifecycle list with server-side pagination (#1552).
+   * Unified Memory Lifecycle list with server-side pagination.
    */
   getLifecycleMemories: (options = {}) => {
     const params = new URLSearchParams();
@@ -64,14 +73,19 @@ export const knowledgeApi = {
     apiClient.patch(`/api/knowledge/${type}/${id}/feedback`, { rating }),
   recalculateImportance: () =>
     apiClient.post(`/api/knowledge/importance/recalculate`),
-  // Memory Lifecycle Management (#377, #716)
+  // Memory Lifecycle Management
   runLifecycleSweep: () => apiClient.post(`/api/knowledge/lifecycle/run`),
   updateMemoryLifecycleState: (type, id, state, reason) =>
     apiClient.patch(`/api/knowledge/${type}/${id}/lifecycle`, {
       state,
       reason,
     }),
-  // Memory Consolidation Engine
+  bulkTransitionLifecycle: (items, state, reason = "") =>
+    apiClient.post(`/api/knowledge/lifecycle/bulk`, {
+      items,
+      state,
+      reason,
+    }),
   runConsolidation: ({ dryRun = true, models } = {}) =>
     apiClient.post(`/api/knowledge/consolidate`, {
       dryRun,
@@ -81,7 +95,6 @@ export const knowledgeApi = {
     apiClient.get(
       `/api/knowledge/consolidation/history?model=${model}&limit=${limit}`,
     ),
-  // Memory Graph Snapshot & Time-Travel
   getGraphSnapshots: ({ limit = 20, before, page } = {}) => {
     const params = new URLSearchParams();
     if (limit) params.append("limit", limit);
@@ -89,7 +102,6 @@ export const knowledgeApi = {
     if (page) params.append("page", page);
     return apiClient.get(`/api/knowledge/graph/snapshots?${params.toString()}`);
   },
-
   getGraphSnapshot: (id) =>
     apiClient.get(`/api/knowledge/graph/snapshots/${id}`),
   exportGraphSnapshot: (id) =>
@@ -100,7 +112,7 @@ export const knowledgeApi = {
     ),
   createGraphSnapshot: (force = false) =>
     apiClient.post(`/api/knowledge/graph/snapshots`, { force }),
-  // AI-Powered Contradiction Detection & Conflict Resolution (#375, #715)
+  // AI-Powered Contradiction Detection & Conflict Resolution
   scanForConflicts: ({
     dryRun = false,
     models,
@@ -129,4 +141,17 @@ export const knowledgeApi = {
       ...(customValue ? { customValue } : {}),
       ...(note ? { note } : {}),
     }),
+  getConflictAuditHistory: ({ page = 1, limit = 50 } = {}) =>
+    apiClient.get(
+      `/api/knowledge/conflicts/audit-history?page=${page}&limit=${limit}`,
+    ),
+  bulkResolveConflicts: ({ conflictIds, resolutionType, customValue, note }) =>
+    apiClient.post(`/api/knowledge/conflicts/bulk-resolve`, {
+      conflictIds,
+      resolutionType,
+      ...(customValue ? { customValue } : {}),
+      ...(note ? { note } : {}),
+    }),
+  getMemoryTelemetry: (timeframe = "30d") =>
+    apiClient.get(`/api/knowledge/analytics/telemetry?timeframe=${timeframe}`),
 };

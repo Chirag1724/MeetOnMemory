@@ -2,6 +2,11 @@ import Meeting from "../models/meetingModel.js";
 import { hasPermission } from "../utils/rbacPermissions.js";
 import streamingTranscriptionService from "../services/StreamingTranscriptionService.js";
 import { getRedisClient } from "../services/redisService.js";
+import TranscriptChapter from "../models/transcriptChapterModel.js";
+import { describeVisualFrame } from "../services/GenerativeAIService.js";
+import crypto from "crypto";
+import fs from "fs/promises";
+import path from "path";
 
 /**
  * Meeting Socket Handler with Multi-Instance Presence Support
@@ -253,6 +258,16 @@ export default (io) => {
         // Socket.IO adapter ensures this reaches all instances
         socket.to(roomId).emit("user-joined", user);
         console.log(`User ${socket.id} joined room: ${roomId}`);
+
+        try {
+          const { checkIn } =
+            await import("../services/meetingAttendanceService.js");
+          if (user.email) {
+            await checkIn(roomId, user.email, new Date());
+          }
+        } catch (err) {
+          console.error("Auto check-in error:", err.message);
+        }
       } catch (error) {
         console.error("Error joining meeting:", error);
         socket.emit("error", { message: "Failed to join meeting" });
@@ -360,6 +375,16 @@ export default (io) => {
         // Socket.IO adapter ensures this reaches all connected clients
         socket.to(roomId).emit("user-left", socket.id);
         localSocketToRoom.delete(socket.id);
+
+        try {
+          const { checkOut } =
+            await import("../services/meetingAttendanceService.js");
+          if (socket.user?.email) {
+            await checkOut(roomId, socket.user.email, new Date());
+          }
+        } catch (err) {
+          console.error("Auto check-out error:", err.message);
+        }
       }
     });
 
@@ -424,6 +449,120 @@ export default (io) => {
     });
 
     /**
+     * Process visual frame data from screen shares
+     */
+    socket.on("screen-frame", async ({ roomId, frame, timestamp }) => {
+      try {
+        if (!(await canAccessMeeting(roomId))) return;
+
+        // Hash the base64 string to detect significant changes
+        const hash = crypto.createHash("sha256").update(frame).digest("hex");
+
+        // Simple deduplication using memory (per instance). In a multi-instance setup,
+        // this might process identical frames once per instance, which is acceptable
+        // since we check the latest hash. Or we can use redis. For simplicity, use a local Map.
+        if (!roomTimers[roomId]) roomTimers[roomId] = { lastFrameHash: null };
+        if (roomTimers[roomId].lastFrameHash === hash) return; // No change
+
+        roomTimers[roomId].lastFrameHash = hash;
+
+        // Ensure upload directory exists
+        const framesDir = path.resolve("uploads", "frames");
+        await fs.mkdir(framesDir, { recursive: true });
+
+        // Save image to disk
+        const filename = `${roomId}-${timestamp}.jpg`;
+        const filepath = path.join(framesDir, filename);
+
+        const base64Data = frame.replace(/^data:image\/\w+;base64,/, "");
+        await fs.writeFile(filepath, base64Data, "base64");
+        const imageUrl = `/uploads/frames/${filename}`;
+
+        // Process with Gemini Vision
+        const visionResult = await describeVisualFrame(frame);
+
+        if (visionResult) {
+          // Find or create TranscriptChapter document for the meeting
+          let tc = await TranscriptChapter.findOne({ meeting: roomId });
+          if (!tc) {
+            const meeting = await Meeting.findById(roomId);
+            if (!meeting) return;
+            tc = new TranscriptChapter({
+              meeting: roomId,
+              organization: meeting.organization,
+              chapters: [],
+            });
+          }
+
+          tc.chapters.push({
+            title: `Slide at ${new Date(timestamp).toLocaleTimeString()}`,
+            startTime: timestamp,
+            endTime: timestamp + 10000, // approximate 10s
+            imageUrl,
+            extractedText: visionResult.extractedText || "",
+            summary: visionResult.description || "",
+            isManual: false,
+          });
+
+          await tc.save();
+        }
+      } catch (error) {
+        console.error("Error processing screen frame:", error);
+      }
+    });
+
+    /**
+     * Breakout Rooms
+     */
+    socket.on("breakout:join", ({ roomId, breakoutRoomId }) => {
+      // Join the specific breakout room socket channel
+      socket.join(`breakout-${breakoutRoomId}`);
+      // Notify others in the main room that user joined a breakout room
+      socket.to(roomId).emit("breakout:user-joined", {
+        userId: socket.userId,
+        breakoutRoomId,
+      });
+    });
+
+    socket.on("breakout:leave", ({ roomId, breakoutRoomId }) => {
+      socket.leave(`breakout-${breakoutRoomId}`);
+      socket
+        .to(roomId)
+        .emit("breakout:user-left", { userId: socket.userId, breakoutRoomId });
+    });
+
+    socket.on("breakout:started", ({ roomId, breakoutRoomId }) => {
+      // Notify main room that a breakout room was started
+      socket.to(roomId).emit("breakout:started", { breakoutRoomId });
+    });
+
+    socket.on("breakout:closed", ({ roomId, breakoutRoomId }) => {
+      // Notify main room that a breakout room was closed
+      socket.to(roomId).emit("breakout:closed", { breakoutRoomId });
+    });
+
+    socket.on("breakout:broadcast", ({ roomId, message, sender }) => {
+      const payload = {
+        sender: sender || "Host Notification",
+        message,
+        timestamp: Date.now(),
+        roomId,
+      };
+      io.to(roomId).emit("breakout:broadcast", payload);
+      io.to(`meeting:${roomId}`).emit("breakout_broadcast_received", payload);
+    });
+
+    socket.on("breakout:close-all", ({ roomId }) => {
+      io.to(roomId).emit("breakout:closed-all", { roomId });
+      io.to(`meeting:${roomId}`).emit("breakout_closed_all");
+    });
+
+    socket.on("breakout:shuffled", ({ roomId, allocations }) => {
+      io.to(roomId).emit("breakout:shuffled", { roomId, allocations });
+      io.to(`meeting:${roomId}`).emit("breakout_shuffled", { allocations });
+    });
+
+    /**
      * Timer synchronization across all users in a meeting
      * Timer state remains local as it's instance-specific
      */
@@ -478,6 +617,27 @@ export default (io) => {
 
       // Broadcast timer state to all users in room (across all instances)
       io.to(roomId).emit("timer-sync", timer);
+    });
+
+    /**
+     * Q&A Board Events
+     */
+    socket.on("qa:submit-question", (payload) => {
+      io.to(payload.roomId).emit("qa:question-added", payload.question);
+    });
+
+    socket.on("qa:upvote-question", (payload) => {
+      io.to(payload.roomId).emit("qa:question-upvoted", {
+        questionId: payload.questionId,
+        upvotes: payload.upvotes,
+      });
+    });
+
+    socket.on("qa:status-changed", (payload) => {
+      io.to(payload.roomId).emit("qa:question-status-changed", {
+        questionId: payload.questionId,
+        status: payload.status,
+      });
     });
 
     /**

@@ -1,7 +1,6 @@
-const jwt = require("jsonwebtoken");
-const User = require("../models/User");
-const CrdtService = require("../services/crdtService");
-const NotePresence = require("../models/NotePresence");
+import CrdtService from "../services/crdtService.js";
+import NotePresence from "../models/NotePresence.js";
+import authenticateSocket from "../middleware/socketAuth.js";
 
 // Predefined colors for user cursors to ensure visual distinction
 const CURSOR_COLORS = [
@@ -25,24 +24,7 @@ const initializeNotesSocket = (io) => {
   const notesNamespace = io.of("/notes");
 
   // Authentication middleware for Socket.io connections
-  notesNamespace.use(async (socket, next) => {
-    try {
-      const token =
-        socket.handshake.auth.token ||
-        socket.handshake.headers.authorization?.split(" ")[1];
-      if (!token)
-        return next(new Error("Authentication error: No token provided"));
-
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await User.findById(decoded.id).select("name email role");
-      if (!user) return next(new Error("Authentication error: User not found"));
-
-      socket.user = user;
-      next();
-    } catch (_) {
-      next(new Error("Authentication error: Invalid token"));
-    }
-  });
+  notesNamespace.use(authenticateSocket);
 
   notesNamespace.on("connection", async (socket) => {
     console.log(`[NotesSocket] User ${socket.user.name} connected`);
@@ -108,7 +90,7 @@ const initializeNotesSocket = (io) => {
      * @desc Receives a binary CRDT update from a client, applies it to the server doc,
      * and broadcasts it to all other clients in the room.
      */
-    socket.on("sync-update", async ({ meetingId, update }) => {
+    socket.on("sync-update", async ({ meetingId, update }, callback) => {
       try {
         const uint8Update = new Uint8Array(update);
 
@@ -120,8 +102,15 @@ const initializeNotesSocket = (io) => {
           update: Array.from(uint8Update),
           userId: socket.user.id,
         });
+
+        if (typeof callback === "function") {
+          callback({ success: true });
+        }
       } catch (error) {
         console.error("[NotesSocket] Error applying update:", error);
+        if (typeof callback === "function") {
+          callback({ success: false, error: error.message });
+        }
       }
     });
 
@@ -197,4 +186,4 @@ const initializeNotesSocket = (io) => {
   });
 };
 
-module.exports = initializeNotesSocket;
+export default initializeNotesSocket;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useContext } from "react";
 import Navbar from "../components/Navbar.jsx";
 import {
   Users,
@@ -16,13 +16,19 @@ import {
   Send,
   Ban,
   AlertTriangle,
+  Upload,
 } from "lucide-react";
 import { useTeamManagement } from "../hooks/useTeamManagement";
 import InviteMemberForm from "../components/team/InviteMemberForm";
+import BulkInviteModal from "../components/team/BulkInviteModal";
 import TeamMemberTable from "../components/team/TeamMemberTable";
+import AppContent from "../context/AppContent";
+import AnalyticsDashboard from "../components/analytics/AnalyticsDashboard";
 
 const TeamMembers = () => {
-  const [activeTab, setActiveTab] = useState("members"); // "members" | "invitations"
+  const [activeTab, setActiveTab] = useState("members"); // "members" | "invitations" | "analytics"
+  const { userData } = useContext(AppContent);
+  const teamId = userData?.organization?._id || userData?.organization;
 
   const {
     members,
@@ -33,9 +39,14 @@ const TeamMembers = () => {
     isAdmin,
     fetchMembers,
     handleSendInvite,
+    handleBulkInvite,
     handleResendInvite,
     handleCancelInvite,
     handleExpireInvite,
+    handleUpdateRole,
+    handleDeactivateMember,
+    handleReactivateMember,
+    handleUpdateCapacity,
   } = useTeamManagement(activeTab);
 
   const [filteredMembers, setFilteredMembers] = useState([]);
@@ -44,8 +55,10 @@ const TeamMembers = () => {
   const [sortBy] = useState("name");
   const [sortOrder] = useState("asc");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showBulkInviteModal, setShowBulkInviteModal] = useState(false);
 
   const applyFiltersAndSort = useCallback(() => {
     let result = [...members];
@@ -62,6 +75,19 @@ const TeamMembers = () => {
 
     if (roleFilter !== "all") {
       result = result.filter((member) => member.role === roleFilter);
+    }
+
+    if (statusFilter !== "all") {
+      if (statusFilter === "active") {
+        result = result.filter((m) => !m.status || m.status === "active");
+      } else if (statusFilter === "deactivated") {
+        result = result.filter(
+          (m) =>
+            m.status === "inactive" ||
+            m.status === "suspended" ||
+            m.status === "deactivated",
+        );
+      }
     }
 
     result.sort((a, b) => {
@@ -83,7 +109,7 @@ const TeamMembers = () => {
     });
 
     setFilteredMembers(result);
-  }, [members, searchQuery, roleFilter, sortBy, sortOrder]);
+  }, [members, searchQuery, roleFilter, statusFilter, sortBy, sortOrder]);
 
   useEffect(() => {
     applyFiltersAndSort();
@@ -158,29 +184,38 @@ const TeamMembers = () => {
             </div>
           </div>
           {isAdmin && (
-            <button
-              onClick={() => setShowInviteModal(true)}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 active:scale-95 transition-all shadow-md shadow-blue-600/20 cursor-pointer"
-            >
-              <Plus className="h-4 w-4" />
-              Invite Member
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setShowBulkInviteModal(true)}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-95 transition-all shadow-2xs cursor-pointer text-sm"
+              >
+                <Upload className="h-4 w-4" />
+                Import CSV
+              </button>
+              <button
+                onClick={() => setShowInviteModal(true)}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 active:scale-95 transition-all shadow-md shadow-blue-600/20 cursor-pointer text-sm"
+              >
+                <Plus className="h-4 w-4" />
+                Invite Member
+              </button>
+            </div>
           )}
         </div>
 
         {/* Tabs */}
-        {isAdmin && (
-          <div className="flex border-b border-slate-200 dark:border-slate-800 mb-6">
-            <button
-              onClick={() => setActiveTab("members")}
-              className={`pb-3 px-4 text-sm font-semibold border-b-2 transition-all cursor-pointer ${
-                activeTab === "members"
-                  ? "border-blue-600 text-blue-600 dark:text-blue-400"
-                  : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
-              }`}
-            >
-              Members
-            </button>
+        <div className="flex border-b border-slate-200 dark:border-slate-800 mb-6">
+          <button
+            onClick={() => setActiveTab("members")}
+            className={`pb-3 px-4 text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+              activeTab === "members"
+                ? "border-blue-600 text-blue-600 dark:text-blue-400"
+                : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
+            }`}
+          >
+            Members
+          </button>
+          {isAdmin && (
             <button
               onClick={() => setActiveTab("invitations")}
               className={`pb-3 px-4 text-sm font-semibold border-b-2 transition-all cursor-pointer ${
@@ -191,8 +226,18 @@ const TeamMembers = () => {
             >
               Invitations
             </button>
-          </div>
-        )}
+          )}
+          <button
+            onClick={() => setActiveTab("analytics")}
+            className={`pb-3 px-4 text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+              activeTab === "analytics"
+                ? "border-blue-600 text-blue-600 dark:text-blue-400"
+                : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
+            }`}
+          >
+            Analytics
+          </button>
+        </div>
 
         {activeTab === "members" ? (
           <>
@@ -226,11 +271,23 @@ const TeamMembers = () => {
                     <select
                       value={roleFilter}
                       onChange={(e) => setRoleFilter(e.target.value)}
-                      className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                     >
                       <option value="all">All Roles</option>
+                      <option value="owner">Owner</option>
                       <option value="admin">Admin</option>
                       <option value="member">Member</option>
+                      <option value="viewer">Viewer</option>
+                    </select>
+
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    >
+                      <option value="all">All Statuses</option>
+                      <option value="active">Active Only</option>
+                      <option value="deactivated">Deactivated Only</option>
                     </select>
                   </div>
                 )}
@@ -241,9 +298,14 @@ const TeamMembers = () => {
               members={filteredMembers}
               searchQuery={searchQuery}
               roleFilter={roleFilter}
+              isAdmin={isAdmin}
+              onDeactivate={handleDeactivateMember}
+              onReactivate={handleReactivateMember}
+              onUpdateRole={handleUpdateRole}
+              onUpdateCapacity={handleUpdateCapacity}
             />
           </>
-        ) : (
+        ) : activeTab === "invitations" ? (
           <>
             {/* Invitations List */}
             {invitesLoading ? (
@@ -260,12 +322,24 @@ const TeamMembers = () => {
                   Invite members by email to onboard them into your
                   organization.
                 </p>
-                <button
-                  onClick={() => setShowInviteModal(true)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer font-semibold shadow-md shadow-blue-600/10 active:scale-95"
-                >
-                  Send Invitation
-                </button>
+                {isAdmin && (
+                  <div className="flex flex-wrap items-center justify-center gap-3">
+                    <button
+                      onClick={() => setShowBulkInviteModal(true)}
+                      className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors cursor-pointer font-semibold shadow-2xs active:scale-95 flex items-center gap-2 text-sm"
+                    >
+                      <Upload className="h-4 w-4" />
+                      Bulk Import CSV
+                    </button>
+                    <button
+                      onClick={() => setShowInviteModal(true)}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer font-semibold shadow-md shadow-blue-600/10 active:scale-95 flex items-center gap-2 text-sm"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Send Invitation
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-3 animate-in fade-in duration-200">
@@ -280,7 +354,7 @@ const TeamMembers = () => {
                           {invite.email}
                         </span>
                         <span
-                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                          className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
                             invite.role === "admin"
                               ? "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/20 dark:text-violet-400 dark:border-violet-800"
                               : "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-900/20 dark:text-sky-400 dark:border-sky-800"
@@ -369,6 +443,8 @@ const TeamMembers = () => {
               </div>
             )}
           </>
+        ) : (
+          <AnalyticsDashboard teamId={teamId} />
         )}
       </div>
 
@@ -376,6 +452,21 @@ const TeamMembers = () => {
         <InviteMemberForm
           onClose={() => setShowInviteModal(false)}
           onSendInvite={handleSendInvite}
+          onOpenBulkImport={() => {
+            setShowInviteModal(false);
+            setShowBulkInviteModal(true);
+          }}
+        />
+      )}
+
+      {showBulkInviteModal && (
+        <BulkInviteModal
+          onClose={() => setShowBulkInviteModal(false)}
+          onBulkInvite={handleBulkInvite}
+          onSwitchToSingle={() => {
+            setShowBulkInviteModal(false);
+            setShowInviteModal(true);
+          }}
         />
       )}
     </div>

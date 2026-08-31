@@ -11,6 +11,10 @@ import keyMomentSocket from "../socket/keyMomentSocket.js";
 import agendaBuilderSocket from "../socket/agendaBuilderSocket.js";
 import { initWorkspaceSocket } from "../socket/workspaceSocket.js";
 import authenticateSocket from "../middleware/socketAuth.js";
+import pulseCheckSocket from "../socket/pulseCheckSocket.js";
+import activitySocket from "../socket/activitySocket.js";
+import playbookSocket from "../socket/playbookSocket.js";
+import notesSocket from "../socket/notesSocket.js";
 
 export function configureSocket(server, app) {
   // SOCKET.IO
@@ -90,6 +94,10 @@ export function configureSocket(server, app) {
   agendaBuilderSocket(io);
   // Collaborative War Room namespace (/workspace) — registered exactly once here (#1399)
   initWorkspaceSocket(io);
+  pulseCheckSocket(io);
+  activitySocket(io);
+  playbookSocket(io);
+  notesSocket(io);
 
   return io;
 }

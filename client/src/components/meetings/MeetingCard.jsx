@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useContext } from "react";
 import {
   Calendar,
   Clock,
@@ -13,6 +13,7 @@ import {
   Star,
 } from "lucide-react";
 
+import AppContent from "../../context/AppContent.js";
 import useExport from "../../hooks/useExport.js";
 import ConfirmModal from "../ConfirmModal.jsx";
 import { favoriteApi } from "../../services";
@@ -25,6 +26,9 @@ const MeetingCard = ({
   isSelected,
   onToggleSelect,
 }) => {
+  const { userData } = useContext(AppContent);
+  const isViewerOrGuest =
+    userData?.role === "viewer" || userData?.role === "guest";
   const { exportMeeting, isExporting } = useExport();
   const [showMenu, setShowMenu] = useState(false);
   const [showExportSubMenu, setShowExportSubMenu] = useState(false);
@@ -218,19 +222,21 @@ const MeetingCard = ({
             </button>
             {showMenu && (
               <div className="absolute right-0 top-full mt-1 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-10 min-w-[160px] text-gray-700 dark:text-gray-200">
-                <button
-                  onClick={() => {
-                    setIsRenaming(true);
-                    setShowMenu(false);
-                  }}
-                  className="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2 text-sm"
-                >
-                  <Edit2
-                    size={16}
-                    className="text-gray-500 dark:text-gray-400"
-                  />
-                  Rename
-                </button>
+                {!isViewerOrGuest && (
+                  <button
+                    onClick={() => {
+                      setIsRenaming(true);
+                      setShowMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2 text-sm"
+                  >
+                    <Edit2
+                      size={16}
+                      className="text-gray-500 dark:text-gray-400"
+                    />
+                    Rename
+                  </button>
+                )}
                 <div
                   className="relative"
                   onMouseEnter={() => setShowExportSubMenu(true)}
@@ -301,16 +307,18 @@ const MeetingCard = ({
                   )}
                 </div>
 
-                <button
-                  onClick={() => {
-                    setShowDeleteModal(true);
-                    setShowMenu(false);
-                  }}
-                  className="w-full px-4 py-2 text-left hover:bg-red-50 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 flex items-center gap-2 text-sm"
-                >
-                  <Trash2 size={16} />
-                  Delete
-                </button>
+                {!isViewerOrGuest && (
+                  <button
+                    onClick={() => {
+                      setShowDeleteModal(true);
+                      setShowMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left hover:bg-red-50 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 flex items-center gap-2 text-sm"
+                  >
+                    <Trash2 size={16} />
+                    Delete
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -375,11 +383,25 @@ const MeetingCard = ({
                 </span>
               ))}
               {meeting.tags.length > 3 && (
-                <span className="px-2 py-0.5 bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300 rounded text-xs">
-                  +{meeting.tags.length - 3}
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  +{meeting.tags.length - 3} more
                 </span>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Custom Fields Badges */}
+        {meeting.customFields && meeting.customFields.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {meeting.customFields.slice(0, 3).map((field, index) => (
+              <span
+                key={field._id || index}
+                className="px-2 py-0.5 bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-100 dark:border-purple-800 rounded text-xs font-medium"
+              >
+                {field.name || field.key}: {String(field.value)}
+              </span>
+            ))}
           </div>
         )}
 

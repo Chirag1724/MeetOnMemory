@@ -176,6 +176,58 @@ export const updateUserProfile = async (req, res) => {
   }
 };
 
+// @desc    Upload avatar image
+// @route   POST /api/user/avatar
+// @access  Private
+export const uploadAvatar = async (req, res) => {
+  try {
+    if (!req.user || (!req.user.id && !req.user._id)) {
+      return sendError(res, 401, "Authentication error, user ID not found.");
+    }
+    if (!req.file) {
+      return sendError(res, 400, "No avatar file provided.");
+    }
+
+    const userId = String(req.user.id || req.user._id);
+    const profilePicUrl = `/uploads/avatars/${req.file.filename}`;
+
+    const user = await userModel.findById(userId);
+    if (!user) {
+      if (req.file && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      return sendError(res, 404, "User not found.");
+    }
+
+    // Delete old local avatar file if it exists and is local
+    if (user.profilePic && user.profilePic.startsWith("/uploads/avatars/")) {
+      const oldPath = path.resolve(user.profilePic.substring(1));
+      if (fs.existsSync(oldPath)) {
+        try {
+          fs.unlinkSync(oldPath);
+        } catch (err) {
+          console.warn("Failed to delete old avatar file:", err);
+        }
+      }
+    }
+
+    user.profilePic = profilePicUrl;
+    await user.save();
+
+    return sendSuccess(
+      res,
+      { profilePic: profilePicUrl },
+      "Avatar uploaded successfully.",
+    );
+  } catch (error) {
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    console.error("Error in uploadAvatar:", error);
+    sendError(res, 500, "Server error during avatar upload.");
+  }
+};
+
 // @desc    Request data export
 // @route   POST /api/user/request-data-export
 // @access  Private
@@ -216,11 +268,16 @@ export const requestDataExport = async (req, res) => {
 
       await userModel.findByIdAndUpdate(userId, {
         lastExportRequestedAt: new Date(),
+        lastExportStatus: "processing",
+        lastExportError: null,
       });
 
       return sendSuccess(
         res,
-        null,
+        {
+          status: "processing",
+          requestedAt: new Date(),
+        },
         "Data export request accepted. You will receive an email when it is ready.",
         202,
       );
@@ -233,6 +290,91 @@ export const requestDataExport = async (req, res) => {
     }
   } catch (error) {
     console.error("Error in requestDataExport:", error);
+    sendError(res, 500, "Server error");
+  }
+};
+
+// @desc    Get current user's data export status and download link
+// @route   GET /api/user/data-export-status
+// @access  Private
+export const getDataExportStatus = async (req, res) => {
+  try {
+    if (!req.user || !req.user.id) {
+      return sendError(res, 401, "Authentication error, user ID not found.");
+    }
+
+    const userId = String(req.user.id);
+    const user = await userModel.findById(userId);
+    if (!user) {
+      return sendError(res, 404, "User not found.");
+    }
+
+    const COOLDOWN_MS = 24 * 60 * 60 * 1000;
+    const timeSinceLast = user.lastExportRequestedAt
+      ? Date.now() - new Date(user.lastExportRequestedAt).getTime()
+      : Infinity;
+
+    const canRequest = timeSinceLast >= COOLDOWN_MS;
+    const cooldownRemainingMs = canRequest
+      ? 0
+      : Math.max(0, COOLDOWN_MS - timeSinceLast);
+    const cooldownHoursRemaining = canRequest
+      ? 0
+      : Math.ceil(cooldownRemainingMs / (60 * 60 * 1000));
+
+    let downloadUrl = null;
+    let downloadToken = null;
+    let expiresAt = null;
+    let status = user.lastExportStatus || "idle";
+
+    // If an export file is recorded, check if it's still available on disk
+    if (user.lastExportFile) {
+      const exportDir = path.join(__dirname, "..", "uploads", "exports");
+      const filePath = path.join(exportDir, user.lastExportFile);
+
+      if (fs.existsSync(filePath)) {
+        const stats = fs.statSync(filePath);
+        const fileAgeMs = Date.now() - stats.mtime.getTime();
+
+        // 24-hour file retention policy
+        if (fileAgeMs <= COOLDOWN_MS) {
+          const jwtSecret = process.env.JWT_SECRET;
+          downloadToken = jwt.sign(
+            { userId: user._id.toString(), fileName: user.lastExportFile },
+            jwtSecret,
+            { expiresIn: "24h" },
+          );
+          downloadUrl = `/api/user/download-export/${downloadToken}`;
+          expiresAt = new Date(stats.mtime.getTime() + COOLDOWN_MS);
+          status = "completed";
+        } else {
+          // File has expired past retention window
+          if (status === "completed") {
+            status = "idle";
+          }
+        }
+      } else if (status === "completed") {
+        status = "idle";
+      }
+    }
+
+    return sendSuccess(
+      res,
+      {
+        status,
+        lastExportRequestedAt: user.lastExportRequestedAt,
+        canRequest,
+        cooldownRemainingMs,
+        cooldownHoursRemaining,
+        downloadUrl,
+        downloadToken,
+        expiresAt,
+        error: user.lastExportError || null,
+      },
+      "Data export status retrieved successfully.",
+    );
+  } catch (error) {
+    console.error("Error in getDataExportStatus:", error);
     sendError(res, 500, "Server error");
   }
 };
@@ -256,9 +398,21 @@ export const downloadExport = async (req, res) => {
       return sendError(res, 401, "Invalid or expired token.");
     }
 
-    const { fileName } = decoded;
-    if (!fileName) {
+    const { fileName, userId } = decoded;
+    if (!fileName || !userId) {
       return sendError(res, 400, "Invalid token payload.");
+    }
+
+    // Verify fileName structure conforms to user export naming
+    if (
+      !fileName.startsWith(`export_${userId}_`) ||
+      !fileName.endsWith(".zip")
+    ) {
+      return sendError(
+        res,
+        403,
+        "Unauthorized access to requested export file.",
+      );
     }
 
     const exportDir = path.join(__dirname, "..", "uploads", "exports");

@@ -42,6 +42,7 @@ import {
   startActionItemReminderJob,
   stopActionItemReminderJob,
 } from "./jobs/actionItemReminderJob.js";
+import { startMeetingWorkloadJob } from "./jobs/meetingWorkloadJob.js";
 import { startRecapBatchJob, stopRecapBatchJob } from "./jobs/recapBatchJob.js";
 import gamificationEngine from "./services/gamificationEngine.js";
 import { startLeaderboardJob } from "./jobs/leaderboardAggregationJob.js";
@@ -50,14 +51,51 @@ import {
   initAutoBriefingJob,
   stopAutoBriefingJob,
 } from "./jobs/autoBriefingJob.js";
+import {
+  initDataRetentionJob,
+  stopDataRetentionJob,
+} from "./jobs/dataRetentionJob.js";
 import { startEscalationJob, stopEscalationJob } from "./jobs/escalationJob.js";
+import { startNotificationBatchJob } from "./jobs/notificationBatchJob.js";
+import {
+  startMeetingNudgeJob,
+  stopMeetingNudgeJob,
+} from "./jobs/meetingNudgeJob.js";
+import {
+  startWeeklyInsightJob,
+  stopWeeklyInsightJob,
+} from "./jobs/weeklyInsightJob.js";
+import {
+  startStandupReportJob,
+  stopStandupReportJob,
+} from "./jobs/standupReportJob.js";
+import {
+  startActionItemSlaJob,
+  stopActionItemSlaJob,
+} from "./jobs/actionItemSlaJob.js";
+import { startAbsenteeCatchUpJob } from "./jobs/absenteeCatchUpJob.js";
+import startAsyncMeetingSummaryJob from "./jobs/asyncMeetingSummaryJob.js";
+import scheduleRecurringActionItemJob from "./jobs/recurringActionItemJob.js";
+import {
+  startDecisionReviewReminderJob,
+  stopDecisionReviewReminderJob,
+} from "./jobs/decisionReviewReminderJob.js";
+import {
+  startMeetingOwnershipTransferJob,
+  stopMeetingOwnershipTransferJob,
+} from "./jobs/meetingOwnershipTransferJob.js";
+import {
+  startRiskEscalationJob,
+  stopRiskEscalationJob,
+} from "./jobs/riskEscalationJob.js";
 import { createClient } from "redis"; // eslint-disable-line no-unused-vars
 import {
   initDataExportWorker, // eslint-disable-line no-unused-vars
   initConflictScanWorker, // eslint-disable-line no-unused-vars
   shutdownQueues,
 } from "./services/queueService.js";
-import { initWebhookWorker } from "./services/webhookDispatcherService.js"; // eslint-disable-line no-unused-vars
+import { initMembershipRequestExpirationJob } from "./jobs/membershipRequestExpirationJob.js";
+import reminderScheduler from "./services/reminderScheduler.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -71,7 +109,15 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 if (!process.env.JWT_SECRET) {
-  console.error("FATAL ERROR: JWT_SECRET environment variable is missing.");
+  console.warn(
+    "WARNING: JWT_SECRET environment variable is missing. Shared-link JWT functionality will be disabled.",
+  );
+}
+
+if (process.env.NODE_ENV !== "test" && !process.env.TOKEN_ENCRYPTION_KEY) {
+  console.error(
+    "FATAL ERROR: TOKEN_ENCRYPTION_KEY environment variable is required but not set.",
+  );
   process.exit(1);
 }
 
@@ -116,7 +162,21 @@ gamificationEngine.init();
 // SERVER START (Skipped during Jest test execution)
 if (process.env.NODE_ENV !== "test") {
   server.listen(PORT, "0.0.0.0", () => {
+    console.log(`==================================================`);
     console.log(`🚀 MeetOnMemory Server running on port ${PORT}`);
+
+    // Fix #1901: Explicitly initialize the cron runner engine on server startup
+    try {
+      console.log(`⏳ Initializing background Cron systems...`);
+      reminderScheduler.start();
+      console.log(`✅ [Service Health]: Meeting Reminder Scheduler active.`);
+    } catch (schedulerError) {
+      console.error(
+        `❌ [Service Error]: Failed to start Reminder Scheduler:`,
+        schedulerError,
+      );
+    }
+    console.log(`==================================================`);
 
     setTimeout(() => {
       startWorkers(app);
@@ -132,6 +192,9 @@ if (process.env.NODE_ENV !== "test") {
   // Start poll expiration background job
   startPollExpirationJob(io);
 
+  // Start membership request auto-expiration background job (#2483)
+  initMembershipRequestExpirationJob(io);
+
   // Start follow-up reminder background job
   startFollowUpReminderJob();
 
@@ -140,6 +203,7 @@ if (process.env.NODE_ENV !== "test") {
 
   // Start action-item reminder job (Issue #1397)
   startActionItemReminderJob();
+  startMeetingWorkloadJob();
 
   // Start meeting pattern detection job
   startMeetingPatternJob();
@@ -153,8 +217,42 @@ if (process.env.NODE_ENV !== "test") {
   // Start auto pre-meeting briefing job
   initAutoBriefingJob();
 
+  // Start data retention sweep job
+  initDataRetentionJob();
+
   // Start automated escalation job
   startEscalationJob();
+  startNotificationBatchJob();
+
+  // Start meeting nudge job
+  startMeetingNudgeJob();
+
+  // Start weekly insight job
+  startWeeklyInsightJob();
+
+  // Start standup report job
+  startStandupReportJob();
+
+  // Start Action Item SLA background job
+  startActionItemSlaJob();
+
+  // Start Absentee Catch-Up background job
+  startAbsenteeCatchUpJob();
+
+  // Start Async Meeting Summary background job
+  startAsyncMeetingSummaryJob();
+
+  // Start Recurring Action Item job
+  scheduleRecurringActionItemJob();
+
+  // Start Decision Review Reminder job
+  startDecisionReviewReminderJob();
+
+  // Start Meeting Ownership Transfer job
+  startMeetingOwnershipTransferJob();
+
+  // Start Risk Escalation job (#2637)
+  startRiskEscalationJob();
 }
 
 // (AI, Data Export, and Webhook workers are initialized inside server.listen callback)
@@ -167,7 +265,15 @@ const gracefulShutdown = createGracefulShutdown({
     stopActionItemReminderJob();
     stopRecapBatchJob();
     stopAutoBriefingJob();
+    stopDataRetentionJob();
     stopEscalationJob();
+    stopMeetingNudgeJob();
+    stopWeeklyInsightJob();
+    stopStandupReportJob();
+    stopActionItemSlaJob();
+    stopDecisionReviewReminderJob();
+    stopMeetingOwnershipTransferJob();
+    stopRiskEscalationJob();
   },
   closeQueues: shutdownQueues,
   closeDatabase: () => mongoose.connection.close(),

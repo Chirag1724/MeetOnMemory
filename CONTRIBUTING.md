@@ -304,7 +304,11 @@ cd client
 npm install
 ```
 
-Configure Clerk keys (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`) in `client/.env`.
+Configure `client/.env` (see `client/.env.example`):
+
+- `VITE_BACKEND_URL` (Primary backend base URL, defaults to `http://localhost:4000`)
+- `VITE_API_URL` (Fallback backend base URL if `VITE_BACKEND_URL` is unset)
+- `VITE_CLERK_PUBLISHABLE_KEY` (Clerk publishable key)
 
 ```bash
 npm run dev
@@ -331,6 +335,8 @@ npm run server
 - **MongoDB** remains the source of truth for authorization (RBAC — roles/permissions).
 - Secondary **JWTs** are used only for specific features (e.g. shared links, integration tokens) — not for primary auth.
 - Legacy login/session-based auth flow has been fully removed; do not reintroduce it.
+
+For detailed setup, environment variables, local testing, and user synchronization instructions, please refer to the [Authentication Contributor Runbook](docs/AUTH_CONTRIBUTOR_RUNBOOK.md).
 
 ---
 

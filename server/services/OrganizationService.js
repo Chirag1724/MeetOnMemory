@@ -22,17 +22,11 @@ import {
   ValidationError,
 } from "../utils/errors.js";
 import { normalizeImageUrl } from "../utils/imageUrl.js";
+import { escapeRegex } from "../utils/regex.js";
 
 // ═══════════════════════════════════════════════════════════════
 // Private helpers
 // ═══════════════════════════════════════════════════════════════
-
-/**
- * Escape special regex characters to prevent ReDoS attacks
- */
-const escapeRegex = (string) => {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-};
 
 /**
  * Validate MongoDB ObjectId
@@ -390,18 +384,42 @@ export const getOrganizationMembers = async (userId) => {
     throw new ValidationError("User is not part of an organization.");
   }
 
-  const organization = await Organization.findById(user.organization).populate({
-    path: "members",
-    select: "name email role createdAt isAccountVerified",
-  });
+  const cleanOrgId = user.organization._id || user.organization;
+  const organization = await Organization.findById(cleanOrgId);
 
   if (!organization) {
     throw new NotFoundError("Organization not found.");
   }
 
+  const memberships = await Membership.find({
+    organization: cleanOrgId,
+    status: { $in: ["active", "inactive", "suspended", "deactivated"] },
+  })
+    .populate("user", "name email profilePic isAccountVerified createdAt")
+    .populate("roleHistory.changedBy", "name email profilePic")
+    .sort({ joinedAt: -1 })
+    .lean();
+
+  const members = memberships
+    .filter((m) => m.user)
+    .map((m) => ({
+      _id: m.user._id,
+      name: m.user.name,
+      email: m.user.email,
+      profilePic: m.user.profilePic,
+      isAccountVerified: m.user.isAccountVerified,
+      createdAt: m.user.createdAt,
+      role: m.role,
+      status: m.status || "active",
+      capacity: m.capacity || { weeklyHours: 40, maxConcurrentMeetings: 5 },
+      roleHistory: m.roleHistory || [],
+      joinedAt: m.joinedAt || m.createdAt,
+      membershipId: m._id,
+    }));
+
   return {
     success: true,
-    members: organization.members,
+    members,
     organizationName: organization.name,
   };
 };
@@ -1055,6 +1073,12 @@ export const getOrganizationSettings = async (userId, orgIdOrSlug = null) => {
       createdAt: organization.createdAt,
       updatedAt: organization.updatedAt,
       metadata: organization.metadata || {},
+      e2eeSettings: organization.e2eeSettings || {
+        enabled: false,
+        enforceOrgWide: false,
+        updatedAt: null,
+        updatedBy: null,
+      },
     },
     userRole,
     canEdit,
@@ -1079,7 +1103,7 @@ export const getOrganizationById = async (idOrSlug, userId) => {
 
   const organization = await Organization.findOne(query)
     .select(
-      "name slug description about website contactEmail industry location logo bannerUrl visibility joinPolicy owner createdAt updatedAt metadata",
+      "name slug description about website contactEmail industry location logo bannerUrl visibility joinPolicy owner createdAt updatedAt metadata e2eeSettings",
     )
     .populate("owner", "name email")
     .lean();
@@ -1140,6 +1164,7 @@ export const updateOrganization = async (
     visibility,
     joinPolicy,
     metadata,
+    e2eeSettings,
   },
 ) => {
   if (!isValidObjectId(id)) {
@@ -1292,6 +1317,14 @@ export const updateOrganization = async (
   if (cleanJoinPolicy) organization.joinPolicy = cleanJoinPolicy;
   if (metadata)
     organization.metadata = typeof metadata === "object" ? metadata : {};
+  if (e2eeSettings !== undefined && e2eeSettings !== null) {
+    organization.e2eeSettings = {
+      enabled: Boolean(e2eeSettings.enabled),
+      enforceOrgWide: Boolean(e2eeSettings.enforceOrgWide),
+      updatedAt: new Date(),
+      updatedBy: userId,
+    };
+  }
 
   await organization.save();
 
@@ -1393,24 +1426,32 @@ export const getOrganizationMembersById = async (userId, id) => {
     throw new ForbiddenError("Not a member of this organization.");
   }
 
-  // Get all active memberships with user details
+  // Get all memberships with user details
   const memberships = await Membership.find({
     organization: cleanId,
-    status: "active",
+    status: { $in: ["active", "inactive", "suspended", "deactivated"] },
   })
     .populate("user", "name email profilePic isAccountVerified createdAt")
+    .populate("roleHistory.changedBy", "name email profilePic")
     .sort({ joinedAt: -1 })
     .lean();
 
-  const members = memberships.map((m) => ({
-    _id: m.user._id,
-    name: m.user.name,
-    email: m.user.email,
-    profilePic: m.user.profilePic,
-    isAccountVerified: m.user.isAccountVerified,
-    role: m.role,
-    joinedAt: m.joinedAt,
-  }));
+  const members = memberships
+    .filter((m) => m.user)
+    .map((m) => ({
+      _id: m.user._id,
+      name: m.user.name,
+      email: m.user.email,
+      profilePic: m.user.profilePic,
+      isAccountVerified: m.user.isAccountVerified,
+      createdAt: m.user.createdAt,
+      role: m.role,
+      status: m.status || "active",
+      capacity: m.capacity || { weeklyHours: 40, maxConcurrentMeetings: 5 },
+      roleHistory: m.roleHistory || [],
+      joinedAt: m.joinedAt || m.createdAt,
+      membershipId: m._id,
+    }));
 
   return {
     success: true,
@@ -1695,6 +1736,7 @@ export const updateMemberRole = async (
   orgId,
   targetUserId,
   newRole,
+  reason = "",
 ) => {
   if (
     !isValidObjectId(actorId) ||
@@ -1733,6 +1775,16 @@ export const updateMemberRole = async (
   const oldRole = targetMembership?.role || "member";
   if (targetMembership) {
     targetMembership.role = newRole;
+    if (!Array.isArray(targetMembership.roleHistory)) {
+      targetMembership.roleHistory = [];
+    }
+    targetMembership.roleHistory.push({
+      previousRole: oldRole,
+      newRole,
+      changedBy: actorId,
+      changedAt: new Date(),
+      reason: reason || "",
+    });
     await targetMembership.save();
   }
 
@@ -1770,7 +1822,7 @@ export const updateMemberRole = async (
     entity: "User",
     entityId: targetUserId,
     organizationId: orgId,
-    details: { oldRole, newRole, targetUserId },
+    details: { oldRole, newRole, targetUserId, reason },
   });
 
   return {
@@ -1908,5 +1960,265 @@ export const getOrganizationAuditLogsService = async (
       limit: limitNum,
       pages: Math.ceil(total / limitNum) || 1,
     },
+  };
+};
+
+/**
+ * ✅ Deactivate Member in Organization (#2484)
+ */
+export const deactivateMemberInOrganization = async (
+  actorId,
+  orgId,
+  targetUserId,
+  reason = "",
+) => {
+  if (
+    !isValidObjectId(actorId) ||
+    !isValidObjectId(orgId) ||
+    !isValidObjectId(targetUserId)
+  ) {
+    throw new ValidationError("Invalid arguments provided.");
+  }
+
+  const organization = await Organization.findById(orgId);
+  if (!organization) throw new NotFoundError("Organization not found.");
+
+  if (organization.owner?.toString() === targetUserId.toString()) {
+    throw new ForbiddenError("Cannot deactivate the organization owner.");
+  }
+
+  const actorMembership = await Membership.findOne({
+    user: actorId,
+    organization: orgId,
+    status: "active",
+  });
+  const isOwner = organization.owner?.toString() === actorId.toString();
+  const isAdmin =
+    actorMembership?.role === "admin" || actorMembership?.role === "owner";
+  if (!isOwner && !isAdmin) {
+    throw new ForbiddenError("Only owners and admins can deactivate members.");
+  }
+
+  const targetMembership = await Membership.findOne({
+    user: targetUserId,
+    organization: orgId,
+  });
+  if (!targetMembership) {
+    throw new NotFoundError("Member membership record not found.");
+  }
+
+  targetMembership.status = "inactive";
+  await targetMembership.save();
+
+  // Update embedded Organization.members array
+  const memberIdx = organization.members.findIndex(
+    (m) => m.userId?.toString() === targetUserId.toString(),
+  );
+  if (memberIdx >= 0) {
+    organization.members[memberIdx].status = "suspended";
+    await organization.save();
+  }
+
+  await AuditService.logAction({
+    actorId,
+    action: "MEMBER_DEACTIVATED",
+    entity: "User",
+    entityId: targetUserId,
+    organizationId: orgId,
+    details: { targetUserId, reason },
+  });
+
+  return {
+    success: true,
+    message: "Member deactivated successfully.",
+    membership: targetMembership,
+  };
+};
+
+/**
+ * ✅ Reactivate Member in Organization (#2484)
+ */
+export const reactivateMemberInOrganization = async (
+  actorId,
+  orgId,
+  targetUserId,
+) => {
+  if (
+    !isValidObjectId(actorId) ||
+    !isValidObjectId(orgId) ||
+    !isValidObjectId(targetUserId)
+  ) {
+    throw new ValidationError("Invalid arguments provided.");
+  }
+
+  const organization = await Organization.findById(orgId);
+  if (!organization) throw new NotFoundError("Organization not found.");
+
+  const actorMembership = await Membership.findOne({
+    user: actorId,
+    organization: orgId,
+    status: "active",
+  });
+  const isOwner = organization.owner?.toString() === actorId.toString();
+  const isAdmin =
+    actorMembership?.role === "admin" || actorMembership?.role === "owner";
+  if (!isOwner && !isAdmin) {
+    throw new ForbiddenError("Only owners and admins can reactivate members.");
+  }
+
+  const targetMembership = await Membership.findOne({
+    user: targetUserId,
+    organization: orgId,
+  });
+  if (!targetMembership) {
+    throw new NotFoundError("Member membership record not found.");
+  }
+
+  targetMembership.status = "active";
+  await targetMembership.save();
+
+  // Update embedded Organization.members array
+  const memberIdx = organization.members.findIndex(
+    (m) => m.userId?.toString() === targetUserId.toString(),
+  );
+  if (memberIdx >= 0) {
+    organization.members[memberIdx].status = "active";
+    await organization.save();
+  }
+
+  await AuditService.logAction({
+    actorId,
+    action: "MEMBER_REACTIVATED",
+    entity: "User",
+    entityId: targetUserId,
+    organizationId: orgId,
+    details: { targetUserId },
+  });
+
+  return {
+    success: true,
+    message: "Member reactivated successfully.",
+    membership: targetMembership,
+  };
+};
+
+/**
+ * ✅ Update Member Capacity (#2484)
+ */
+export const updateMemberCapacity = async (
+  actorId,
+  orgId,
+  targetUserId,
+  capacityData = {},
+) => {
+  if (
+    !isValidObjectId(actorId) ||
+    !isValidObjectId(orgId) ||
+    !isValidObjectId(targetUserId)
+  ) {
+    throw new ValidationError("Invalid arguments provided.");
+  }
+
+  const organization = await Organization.findById(orgId);
+  if (!organization) throw new NotFoundError("Organization not found.");
+
+  const isSelf = actorId.toString() === targetUserId.toString();
+  const actorMembership = await Membership.findOne({
+    user: actorId,
+    organization: orgId,
+    status: "active",
+  });
+  const isOwner = organization.owner?.toString() === actorId.toString();
+  const isAdmin =
+    actorMembership?.role === "admin" || actorMembership?.role === "owner";
+
+  if (!isSelf && !isOwner && !isAdmin) {
+    throw new ForbiddenError("Not authorized to update member capacity.");
+  }
+
+  const targetMembership = await Membership.findOne({
+    user: targetUserId,
+    organization: orgId,
+  });
+  if (!targetMembership) {
+    throw new NotFoundError("Membership not found.");
+  }
+
+  const weeklyHours =
+    capacityData.weeklyHours !== undefined
+      ? Math.max(0, Math.min(168, Number(capacityData.weeklyHours)))
+      : (targetMembership.capacity?.weeklyHours ?? 40);
+
+  const maxConcurrentMeetings =
+    capacityData.maxConcurrentMeetings !== undefined
+      ? Math.max(1, Number(capacityData.maxConcurrentMeetings))
+      : (targetMembership.capacity?.maxConcurrentMeetings ?? 5);
+
+  targetMembership.capacity = {
+    weeklyHours,
+    maxConcurrentMeetings,
+  };
+
+  await targetMembership.save();
+
+  await AuditService.logAction({
+    actorId,
+    action: "MEMBER_CAPACITY_UPDATED",
+    entity: "Membership",
+    entityId: targetMembership._id,
+    organizationId: orgId,
+    details: { targetUserId, capacity: targetMembership.capacity },
+  });
+
+  return {
+    success: true,
+    message: "Member capacity updated successfully.",
+    capacity: targetMembership.capacity,
+  };
+};
+
+/**
+ * ✅ Get Member Role History (#2484)
+ */
+export const getMemberRoleHistory = async (actorId, orgId, targetUserId) => {
+  if (
+    !isValidObjectId(actorId) ||
+    !isValidObjectId(orgId) ||
+    !isValidObjectId(targetUserId)
+  ) {
+    throw new ValidationError("Invalid arguments provided.");
+  }
+
+  const organization = await Organization.findById(orgId);
+  if (!organization) throw new NotFoundError("Organization not found.");
+
+  const isSelf = actorId.toString() === targetUserId.toString();
+  const actorMembership = await Membership.findOne({
+    user: actorId,
+    organization: orgId,
+    status: "active",
+  });
+  const isOwner = organization.owner?.toString() === actorId.toString();
+  const isAdmin =
+    actorMembership?.role === "admin" || actorMembership?.role === "owner";
+
+  if (!isSelf && !isOwner && !isAdmin) {
+    throw new ForbiddenError("Not authorized to view member role history.");
+  }
+
+  const targetMembership = await Membership.findOne({
+    user: targetUserId,
+    organization: orgId,
+  })
+    .populate("roleHistory.changedBy", "name email profilePic")
+    .lean();
+
+  if (!targetMembership) {
+    throw new NotFoundError("Membership not found.");
+  }
+
+  return {
+    success: true,
+    roleHistory: targetMembership.roleHistory || [],
   };
 };

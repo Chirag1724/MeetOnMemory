@@ -1,22 +1,21 @@
-import React, { useContext } from "react";
+import React, { lazy, Suspense, useContext } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-// --- Routes ---
 import PublicRoutes from "./routes/PublicRoutes.jsx";
 import ProtectedRoutes from "./routes/ProtectedRoutes.jsx";
-
-import NotFound from "./pages/NotFound.jsx";
-
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import ScrollNavigator from "./components/ScrollNavigator";
 import FloatingAssistant from "./components/FloatingAssistant.jsx";
+import GlobalVoiceAssistant from "./components/GlobalVoiceAssistant.jsx";
 import BadgeNotification from "./components/gamification/BadgeNotification.jsx";
-
-// --- Components ---
+import OfflineBanner from "./components/OfflineBanner.jsx";
 import Footer from "./components/Footer.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import AppContent from "./context/AppContent.js";
+
+const NotFound = lazy(() => import("./pages/NotFound.jsx"));
 
 const App = () => {
   const location = useLocation();
@@ -44,18 +43,29 @@ const App = () => {
       </a>
 
       <ErrorBoundary>
+        {/* Global Offline/Reconnect Banner */}
+        <OfflineBanner />
+
         {/* Toast Notifications */}
         <ToastContainer position="top-right" autoClose={3000} theme="colored" />
 
         {/* tabIndex="-1" allows the element to receive programmatic focus from
             the skip link without appearing in the natural Tab order */}
         <main id="main-content" tabIndex={-1} className="outline-none">
-          <Routes>
-            {PublicRoutes}
-            {ProtectedRoutes}
-            {/* ✅ Fallback route — send unknown routes to NotFound */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <Suspense
+            fallback={
+              <div className="min-h-[40vh] flex items-center justify-center text-gray-500 dark:text-gray-400">
+                Loading…
+              </div>
+            }
+          >
+            <Routes>
+              {PublicRoutes}
+              {ProtectedRoutes}
+              {/* ✅ Fallback route — send unknown routes to NotFound */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
         </main>
 
         {/* Floating Section Controller overlay */}
@@ -63,6 +73,9 @@ const App = () => {
 
         {/* Global AI Assistant floating workspace */}
         {isLoggedin && <FloatingAssistant />}
+
+        {/* Global Voice Assistant (Hey Memory) */}
+        {isLoggedin && <GlobalVoiceAssistant />}
 
         {/* Gamification Badge Notifications */}
         {isLoggedin && <BadgeNotification />}

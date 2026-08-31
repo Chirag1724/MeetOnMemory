@@ -2,6 +2,24 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { io } from "socket.io-client";
 import * as Y from "yjs";
+import { toast } from "react-toastify";
+import {
+  createClerkSocketOptions,
+  getClerkBearerToken,
+} from "../services/apiClient.js";
+import { getBackendUrl } from "../config/backendConfig.js";
+
+/**
+ * Sync status values surfaced in collaborative notes UI (#2250).
+ * connecting | synced | saving | offline | error
+ */
+export const COLLAB_SYNC_STATUS = {
+  CONNECTING: "connecting",
+  SYNCED: "synced",
+  SAVING: "saving",
+  OFFLINE: "offline",
+  ERROR: "error",
+};
 
 /**
  * @desc Custom hook to manage the WebSocket connection, Yjs document state,
@@ -9,7 +27,7 @@ import * as Y from "yjs";
  *
  * @param {string} meetingId - The ID of the meeting to collaborate on.
  * @param {boolean} isReadOnly - If true, disables broadcasting of local changes.
- * @returns {Object} Yjs doc, awareness state, connection status, and snapshot functions.
+ * @returns {Object} Yjs doc, awareness state, connection/sync status, and snapshot functions.
  */
 export const useCollaborativeNote = (meetingId, isReadOnly = false) => {
   const { userId, getToken, isSignedIn } = useAuth();
@@ -17,47 +35,116 @@ export const useCollaborativeNote = (meetingId, isReadOnly = false) => {
   const [activeUsers, setActiveUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [syncStatus, setSyncStatus] = useState(COLLAB_SYNC_STATUS.CONNECTING);
 
   // Refs to persist across renders without causing re-renders
   const socketRef = useRef(null);
   const ydocRef = useRef(new Y.Doc());
   const ytextRef = useRef(ydocRef.current.getText("collaborative-note"));
   const userColorRef = useRef("#000000");
+  // Clerk's getToken identity can change every render — keep it out of effect deps
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
+
+  useEffect(() => {
+    const handleOffline = () => {
+      setIsConnected(false);
+      setSyncStatus(COLLAB_SYNC_STATUS.OFFLINE);
+    };
+    const handleOnline = () => {
+      // Socket reconnect will move status to connecting/synced
+      if (!socketRef.current?.connected) {
+        setSyncStatus(COLLAB_SYNC_STATUS.CONNECTING);
+      }
+    };
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      setSyncStatus(COLLAB_SYNC_STATUS.OFFLINE);
+    }
+    return () => {
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnline);
+    };
+  }, []);
 
   useEffect(() => {
     if (!meetingId || !isSignedIn) return;
 
     let isActive = true;
+    setSyncStatus(COLLAB_SYNC_STATUS.CONNECTING);
+    setIsLoading(true);
 
     const initializeSocket = async () => {
-      const token = await getToken();
+      const token = await getTokenRef.current();
 
-      if (!isActive || !token) {
+      if (!isActive) {
         setIsLoading(false);
         return;
       }
 
-      // Initialize Socket.io connection to the /notes namespace
-      const socket = io(`${import.meta.env.VITE_API_URL}/notes`, {
-        auth: { token },
-        transports: ["websocket"],
+      // Initialize Socket.io connection using shared Clerk options & backend URL config
+      const opts = await createClerkSocketOptions({
+        transports: ["websocket", "polling"],
       });
+      if (!isActive) return;
+
+      if (token && (!opts.auth || !opts.auth.token)) {
+        opts.auth = { token };
+      }
+
+      const backendUrl = getBackendUrl();
+      const socket = io(`${backendUrl}/notes`, opts);
       socketRef.current = socket;
+
+      socket.on("connect_error", (err) => {
+        console.error("[CollabNote] Socket connection error:", err);
+        const errorMsg =
+          err?.message || "Failed to connect to collaborative notes server";
+        setError(errorMsg);
+        setIsConnected(false);
+        setIsLoading(false);
+        setSyncStatus(COLLAB_SYNC_STATUS.ERROR);
+        toast.error(`Collaborative notes connection error: ${errorMsg}`);
+      });
+
+      socket.on("reconnect_attempt", async () => {
+        setSyncStatus(COLLAB_SYNC_STATUS.CONNECTING);
+        try {
+          const freshToken =
+            (await getClerkBearerToken()) || (await getTokenRef.current());
+          if (socket.auth) {
+            socket.auth.token = freshToken;
+          } else {
+            socket.auth = { token: freshToken };
+          }
+        } catch (err) {
+          console.warn(
+            "[CollabNote] Failed to refresh token for reconnect",
+            err,
+          );
+        }
+      });
 
       socket.on("connect", () => {
         console.log("[CollabNote] Socket connected");
         setIsConnected(true);
+        setError(null);
+        setSyncStatus(COLLAB_SYNC_STATUS.CONNECTING);
 
         // Join the meeting room and fetch initial state
-        socket.emit("join-meeting", { meetingId }, async (response) => {
-          if (response.success) {
+        socket.emit("join-meeting", { meetingId }, (response) => {
+          // Ignore stale callbacks from React Strict Mode remounts / prior sockets
+          if (socketRef.current !== socket) return;
+          if (response?.success) {
             userColorRef.current = response.userColor;
             setActiveUsers(response.activeUsers || []);
-
-            // Server can send a state vector for future sync logic, but the
-            // current flow relies on the server to provide the full state on join.
+            setSyncStatus(COLLAB_SYNC_STATUS.SYNCED);
           } else {
-            setError(response.error || "Failed to join meeting");
+            const errorMsg = response?.error || "Failed to join meeting";
+            setError(errorMsg);
+            setSyncStatus(COLLAB_SYNC_STATUS.ERROR);
+            toast.error(errorMsg);
           }
           setIsLoading(false);
         });
@@ -66,13 +153,14 @@ export const useCollaborativeNote = (meetingId, isReadOnly = false) => {
       socket.on("disconnect", () => {
         console.log("[CollabNote] Socket disconnected");
         setIsConnected(false);
+        setSyncStatus(COLLAB_SYNC_STATUS.OFFLINE);
       });
 
       // Listen for remote CRDT updates from other clients
       socket.on("remote-update", ({ update, userId: remoteUserId }) => {
         if (remoteUserId !== userId) {
           const uint8Update = new Uint8Array(update);
-          Y.applyUpdate(ydocRef.current, uint8Update);
+          Y.applyUpdate(ydocRef.current, uint8Update, "remote");
         }
       });
 
@@ -122,19 +210,35 @@ export const useCollaborativeNote = (meetingId, isReadOnly = false) => {
       });
 
       socket.on("snapshot-created", (snapshot) => {
-        // Could trigger a toast notification here
         console.log("[CollabNote] New snapshot created:", snapshot);
       });
 
       // Observe local Yjs document changes to broadcast to server
       const updateHandler = (update, origin) => {
-        // Only broadcast if the change originated locally (not from 'remote-update')
-        if (origin !== "remote" && !isReadOnly) {
-          socket.emit("sync-update", {
+        if (origin === "remote" || isReadOnly) return;
+
+        if (!socket.connected) {
+          setSyncStatus(COLLAB_SYNC_STATUS.OFFLINE);
+          return;
+        }
+
+        setSyncStatus(COLLAB_SYNC_STATUS.SAVING);
+        socket.emit(
+          "sync-update",
+          {
             meetingId,
             update: Array.from(update),
-          });
-        }
+          },
+          (response) => {
+            if (socketRef.current !== socket) return;
+            if (response?.success) {
+              setSyncStatus(COLLAB_SYNC_STATUS.SYNCED);
+            } else {
+              setSyncStatus(COLLAB_SYNC_STATUS.ERROR);
+              setError(response?.error || "Failed to sync notes");
+            }
+          },
+        );
       };
 
       const ydoc = ydocRef.current;
@@ -158,7 +262,7 @@ export const useCollaborativeNote = (meetingId, isReadOnly = false) => {
         cleanupSocket.then((cleanup) => cleanup && cleanup());
       }
     };
-  }, [meetingId, getToken, isReadOnly, isSignedIn, userId]);
+  }, [meetingId, isReadOnly, isSignedIn, userId]);
 
   /**
    * @desc Broadcasts local cursor position to other clients.
@@ -202,6 +306,7 @@ export const useCollaborativeNote = (meetingId, isReadOnly = false) => {
     isConnected,
     isLoading,
     error,
+    syncStatus,
     activeUsers,
     userColor: userColorRef.current,
     broadcastCursor,

@@ -350,4 +350,10 @@ router.use("/api/meeting-retrospectives", meetingRetrospectiveRoutes);
 import meetingQuestionRoutes from "./meetingQuestionRoutes.js";
 router.use("/api", meetingQuestionRoutes);
 
+// Issue #2570 — the Custom Roles / Resource-ACL router existed but was never
+// imported here, so every endpoint in the feature returned 404 in the running
+// app. Mounted once under /api/custom-roles.
+import customRoleRoutes from "./customRoleRoutes.js";
+router.use("/api/custom-roles", customRoleRoutes);
+
 export default router;

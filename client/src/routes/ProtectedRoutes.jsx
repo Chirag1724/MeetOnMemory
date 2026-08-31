@@ -63,6 +63,9 @@ const EnterpriseMemoryTelemetry = lazy(
 const KnowledgeArchive = lazy(() => import("../pages/KnowledgeArchive.jsx"));
 const GraphSnapshots = lazy(() => import("../pages/GraphSnapshots.jsx"));
 const KnowledgeGraph = lazy(() => import("../pages/KnowledgeGraph.jsx"));
+const SemanticGraphExplorer = lazy(
+  () => import("../pages/SemanticGraphExplorer.jsx"),
+);
 const DecisionGraph = lazy(() => import("../pages/DecisionGraph.jsx"));
 const DecisionDependencyMatrix = lazy(
   () => import("../pages/DecisionDependencyMatrix.jsx"),
@@ -433,6 +436,14 @@ const ProtectedRoutes = (
       element={
         <ProtectedRoute resource="knowledge" action="view">
           <KnowledgeGraph />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/knowledge/semantic-graph"
+      element={
+        <ProtectedRoute resource="knowledge" action="view">
+          <SemanticGraphExplorer />
         </ProtectedRoute>
       }
     />

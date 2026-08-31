@@ -2,6 +2,8 @@ import MeetingAnalytics from "../models/MeetingAnalytics.js";
 import Meeting from "../models/meetingModel.js";
 import User from "../models/userModel.js";
 import Transcript from "../models/transcriptModel.js";
+import Decision from "../models/decisionModel.js";
+import ActionItem from "../models/actionItemModel.js";
 import { groupByPeriod } from "../utils/periodBucket.js";
 import mongoose from "mongoose";
 
@@ -362,10 +364,32 @@ export const analyzeMeeting = async (meetingId) => {
         : 0;
     const longestIntervention = Math.max(...allInterventions, 0);
 
-    // Count decisions and action items (would need integration with decision/action models)
-    const decisionCount = 0; // Placeholder
-    const actionItemCount = 0; // Placeholder
+    // Count decisions and action items from their respective collections.
+    // Each query is isolated so one failing lookup doesn't block analysis.
+    let decisionCount = 0;
+    let actionItemCount = 0;
 
+    try {
+      decisionCount = await Decision.countDocuments({
+        sourceMeetingId: meetingId,
+      });
+    } catch (error) {
+      console.warn(
+        "Error counting decisions for meeting analytics:",
+        error.message,
+      );
+    }
+
+    try {
+      actionItemCount = await ActionItem.countDocuments({
+        sourceMeetingId: meetingId,
+      });
+    } catch (error) {
+      console.warn(
+        "Error counting action items for meeting analytics:",
+        error.message,
+      );
+    }
     const durationHours = totalDuration / 3600;
     const decisionDensity =
       durationHours > 0 ? decisionCount / durationHours : 0;

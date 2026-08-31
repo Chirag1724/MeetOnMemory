@@ -20,11 +20,19 @@ const SeriesEvolutionTimeline = ({ seriesId }) => {
   const [loadingDiff, setLoadingDiff] = useState(false);
 
   useEffect(() => {
+    const abortController = new AbortController();
+
     const fetchTimeline = async () => {
       try {
-        const response = await api.get(`/api/series-diff/${seriesId}/timeline`);
+        const response = await api.get(
+          `/api/series-diff/${seriesId}/timeline`,
+          {
+            signal: abortController.signal,
+          },
+        );
         setTimelineData(response.data);
       } catch (err) {
+        if (err.name === "CanceledError" || err.name === "AbortError") return;
         console.error("Failed to fetch timeline:", err);
         setError("Failed to load series timeline.");
       } finally {
@@ -32,23 +40,36 @@ const SeriesEvolutionTimeline = ({ seriesId }) => {
       }
     };
     if (seriesId) fetchTimeline();
+
+    return () => {
+      abortController.abort();
+    };
   }, [seriesId]);
+
+  const [abortControllerRef, setAbortControllerRef] = useState(null);
 
   const handleDiffClick = async (index, prevMeetingId, currMeetingId) => {
     if (selectedDiffIndex === index) {
       setSelectedDiffIndex(null);
       setPairwiseDiff(null);
+      if (abortControllerRef) abortControllerRef.abort();
       return;
     }
+
+    if (abortControllerRef) abortControllerRef.abort();
+    const newController = new AbortController();
+    setAbortControllerRef(newController);
 
     setLoadingDiff(true);
     setSelectedDiffIndex(index);
     try {
       const response = await api.get(
         `/api/series-diff/compare?m1Id=${prevMeetingId}&m2Id=${currMeetingId}`,
+        { signal: newController.signal },
       );
       setPairwiseDiff(response.data);
     } catch (err) {
+      if (err.name === "CanceledError" || err.name === "AbortError") return;
       console.error("Failed to load pairwise diff:", err);
     } finally {
       setLoadingDiff(false);
@@ -95,7 +116,10 @@ const SeriesEvolutionTimeline = ({ seriesId }) => {
               Action Item Completion Rate
             </p>
             <p className="text-3xl font-bold text-blue-600">
-              {(trendMetrics.actionItemCompletionRate * 100).toFixed(1)}%
+              {Number.isFinite(trendMetrics?.actionItemCompletionRate)
+                ? (trendMetrics.actionItemCompletionRate * 100).toFixed(1)
+                : "0.0"}
+              %
             </p>
           </div>
           <div className="p-4 bg-purple-50 rounded-lg border border-purple-100">
@@ -103,7 +127,9 @@ const SeriesEvolutionTimeline = ({ seriesId }) => {
               Avg Decisions per Meeting
             </p>
             <p className="text-3xl font-bold text-purple-600">
-              {trendMetrics.decisionVelocity.toFixed(1)}
+              {Number.isFinite(trendMetrics?.decisionVelocity)
+                ? trendMetrics.decisionVelocity.toFixed(1)
+                : "0.0"}
             </p>
           </div>
         </div>

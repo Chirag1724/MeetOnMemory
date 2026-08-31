@@ -18,7 +18,7 @@ describe("useMeetingAttendance (#2623) — /api prefix", () => {
 
   it("fetchAttendance uses /api prefix", async () => {
     api.get.mockResolvedValue({ data: [] });
-    const { result } = renderHook(() => useMeetingAttendance("m1"));
+    renderHook(() => useMeetingAttendance("m1"));
 
     // useEffect calls fetchAttendance automatically on mount
     await act(async () => {
@@ -37,10 +37,13 @@ describe("useMeetingAttendance (#2623) — /api prefix", () => {
       await result.current.checkIn("test@example.com", "2026-08-31");
     });
 
-    expect(api.post).toHaveBeenCalledWith("/api/meetings/m2/attendance/checkin", {
-      email: "test@example.com",
-      joinTime: "2026-08-31",
-    });
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/meetings/m2/attendance/checkin",
+      {
+        email: "test@example.com",
+        joinTime: "2026-08-31",
+      },
+    );
   });
 
   it("checkOut uses /api prefix", async () => {
@@ -52,10 +55,13 @@ describe("useMeetingAttendance (#2623) — /api prefix", () => {
       await result.current.checkOut("test@example.com", "2026-08-31");
     });
 
-    expect(api.post).toHaveBeenCalledWith("/api/meetings/m3/attendance/checkout", {
-      email: "test@example.com",
-      leaveTime: "2026-08-31",
-    });
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/meetings/m3/attendance/checkout",
+      {
+        email: "test@example.com",
+        leaveTime: "2026-08-31",
+      },
+    );
   });
 
   it("markExcused uses /api prefix", async () => {
@@ -81,6 +87,8 @@ describe("useMeetingAttendance (#2623) — /api prefix", () => {
       await result.current.finalizeAttendance();
     });
 
-    expect(api.post).toHaveBeenCalledWith("/api/meetings/m5/attendance/finalize");
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/meetings/m5/attendance/finalize",
+    );
   });
 });

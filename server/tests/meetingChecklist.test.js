@@ -241,7 +241,9 @@ describe("Meeting Checklist API", () => {
 
   it("should trigger reminder notifications targeting assignees", async () => {
     // Create a meeting happening in ~24h
-    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000 + 30 * 60 * 1000); // 24h 30m from now
+    const tomorrow = new Date(
+      Date.now() + 24 * 60 * 60 * 1000 + 30 * 60 * 1000,
+    ); // 24h 30m from now
     const upcomingMeeting = await Meeting.create({
       title: "Upcoming Sync",
       owner: user._id,
@@ -269,9 +271,8 @@ describe("Meeting Checklist API", () => {
     });
 
     // Import job and eventBus
-    const { processChecklistReminders } = await import(
-      "../jobs/checklistReminderJob.js"
-    );
+    const { processChecklistReminders } =
+      await import("../jobs/checklistReminderJob.js");
     const { default: eventBus } = await import("../services/eventBus.js");
 
     const emittedNotifications = [];

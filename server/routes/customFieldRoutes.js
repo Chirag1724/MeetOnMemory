@@ -4,8 +4,9 @@ import {
   getDefinitions,
   updateDefinition,
   deleteDefinition,
-  setMeetingFields,
   getMeetingFields,
+  getMeetingsWithFacets,
+  updateMeetingCustomFields,
 } from "../controllers/customFieldController.js";
 import requireAuth from "../middleware/userAuth.js";
 import { requireOrgMembership, requireRole } from "../middleware/rbac.js";
@@ -24,7 +25,12 @@ router.post("/org/:orgId", requireOrgAdmin, createDefinition);
 router.patch("/org/:orgId/:definitionId", requireOrgAdmin, updateDefinition);
 router.delete("/org/:orgId/:definitionId", requireOrgAdmin, deleteDefinition);
 
-router.post("/meeting/:meetingId", setMeetingFields);
+router.post("/query", getMeetingsWithFacets);
+router.get("/query", getMeetingsWithFacets);
+router.post("/facets", getMeetingsWithFacets);
+
+router.post("/meeting/:meetingId", updateMeetingCustomFields);
+router.put("/meeting/:meetingId", updateMeetingCustomFields);
 router.get("/meeting/:meetingId", getMeetingFields);
 
 export default router;

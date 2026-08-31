@@ -508,7 +508,9 @@ const PrepChecklist = ({ meeting, currentUser }) => {
                           }`}
                         >
                           {isOverdue && <AlertCircle className="w-3 h-3" />}
-                          Due: {new Date(item.dueDate).toLocaleDateString()}{" "}
+                          Due: {new Date(
+                            item.dueDate,
+                          ).toLocaleDateString()}{" "}
                           {new Date(item.dueDate).toLocaleTimeString([], {
                             hour: "2-digit",
                             minute: "2-digit",

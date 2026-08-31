@@ -24,18 +24,24 @@ const createChecklistSchema = z.object({
           .string()
           .nullable()
           .optional()
-          .refine((val) => {
-            if (!val) return true;
-            return mongoose.isValidObjectId(val);
-          }, { message: "Invalid assignee User ID" }),
+          .refine(
+            (val) => {
+              if (!val) return true;
+              return mongoose.isValidObjectId(val);
+            },
+            { message: "Invalid assignee User ID" },
+          ),
         dueDate: z
           .string()
           .nullable()
           .optional()
-          .refine((val) => {
-            if (!val) return true;
-            return !isNaN(Date.parse(val));
-          }, { message: "Invalid due date format" }),
+          .refine(
+            (val) => {
+              if (!val) return true;
+              return !isNaN(Date.parse(val));
+            },
+            { message: "Invalid due date format" },
+          ),
       }),
     )
     .min(1, "At least one item is required"),
@@ -213,7 +219,7 @@ export const toggleItem = async (req, res, next) => {
 export const updateChecklist = async (req, res, next) => {
   try {
     const { items } = createChecklistSchema.parse(req.body);
-    const { meeting, userId } = await resolveAuthorizedMeeting(req, "edit");
+    const { meeting } = await resolveAuthorizedMeeting(req, "edit");
 
     requireChecklistManager(req.user, meeting);
 

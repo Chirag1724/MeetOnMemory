@@ -84,6 +84,10 @@ import {
   startMeetingOwnershipTransferJob,
   stopMeetingOwnershipTransferJob,
 } from "./jobs/meetingOwnershipTransferJob.js";
+import {
+  startRiskEscalationJob,
+  stopRiskEscalationJob,
+} from "./jobs/riskEscalationJob.js";
 import { createClient } from "redis"; // eslint-disable-line no-unused-vars
 import {
   initDataExportWorker, // eslint-disable-line no-unused-vars
@@ -239,6 +243,9 @@ if (process.env.NODE_ENV !== "test") {
 
   // Start Meeting Ownership Transfer job
   startMeetingOwnershipTransferJob();
+
+  // Start Risk Escalation job (#2637)
+  startRiskEscalationJob();
 }
 
 // (AI, Data Export, and Webhook workers are initialized inside server.listen callback)
@@ -259,6 +266,7 @@ const gracefulShutdown = createGracefulShutdown({
     stopActionItemSlaJob();
     stopDecisionReviewReminderJob();
     stopMeetingOwnershipTransferJob();
+    stopRiskEscalationJob();
   },
   closeQueues: shutdownQueues,
   closeDatabase: () => mongoose.connection.close(),

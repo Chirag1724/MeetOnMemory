@@ -119,13 +119,10 @@ const MeetingRepository = () => {
 
     // Apply search
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (meeting) =>
-          meeting.title?.toLowerCase().includes(query) ||
-          meeting.summary?.toLowerCase().includes(query) ||
-          meeting.transcript?.toLowerCase().includes(query) ||
-          meeting.tags?.some((tag) => tag.toLowerCase().includes(query)),
+      const query = searchQuery.trim().toLowerCase();
+
+      filtered = filtered.filter((meeting) =>
+        meeting.title?.toLowerCase().includes(query),
       );
     }
 

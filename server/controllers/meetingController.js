@@ -560,6 +560,42 @@ export const getMeetingById = async (req, res, next) => {
 };
 
 /* ─────────────────────────────────────────────────────────────
+   EXPORT MEETING NOTES (Markdown) — Issue #2543
+   Lets users download a shareable Markdown file of the summary and
+   action items for stakeholders who lack platform access.
+   ───────────────────────────────────────────────────────────── */
+export const exportMeetingNotes = async (req, res, next) => {
+  try {
+    getUserId(req); // ensure authenticated
+    const meeting = await MeetingService.getMeetingById(req.params.id);
+
+    const actionItems = await ActionItem.find({
+      sourceMeetingId: req.params.id,
+    })
+      .sort({ createdAt: 1 })
+      .lean();
+
+    const markdown = renderMeetingNotesMarkdown(meeting, actionItems, {
+      includeTranscript: req.query.transcript === "true",
+    });
+
+    const safeTitle = (meeting?.title || "meeting")
+      .replace(/[^a-z0-9]+/gi, "-")
+      .replace(/^-+|-+$/g, "")
+      .toLowerCase();
+
+    res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${safeTitle || "meeting"}-notes.md"`,
+    );
+    return res.status(200).send(markdown);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/* ─────────────────────────────────────────────────────────────
    8. UPDATE MEETING (Rename / edit fields)
    Used by: MeetingDetails.jsx
    ───────────────────────────────────────────────────────────── */

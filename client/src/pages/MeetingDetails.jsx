@@ -40,6 +40,7 @@ import CompareButton from "../components/meeting-details/CompareButton";
 import AgendaBuilder from "../components/meetings/AgendaBuilder";
 import IcebreakerSection from "../components/meetings/IcebreakerSection";
 import { getBriefing } from "../services/briefingApi";
+import { downloadMeetingNotesMarkdown } from "../services/meetingNotesExportApi";
 import GuestAccessManager from "../components/meetings/GuestAccessManager";
 import MeetingReadiness from "../components/MeetingReadiness";
 import FollowUpThreads from "../components/meeting-details/FollowUpThreads";
@@ -385,6 +386,31 @@ const MeetingDetails = () => {
             >
               <FileText className="w-4 h-4" />
               Export Minutes
+            </button>
+            <button
+              onClick={async () => {
+                try {
+                  const blob = await downloadMeetingNotesMarkdown(meeting._id);
+                  const url = window.URL.createObjectURL(blob);
+                  const link = document.createElement("a");
+                  link.href = url;
+                  link.setAttribute(
+                    "download",
+                    `meeting-notes-${meeting._id}.md`,
+                  );
+                  document.body.appendChild(link);
+                  link.click();
+                  link.remove();
+                  window.URL.revokeObjectURL(url);
+                } catch (err) {
+                  console.error("Failed to download meeting notes:", err);
+                }
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg font-medium shadow-sm transition-colors text-sm"
+              data-testid="download-notes-md-btn"
+            >
+              <FileText className="w-4 h-4" />
+              Download Notes
             </button>
             <button
               onClick={() => setIsEndorseModalOpen(true)}

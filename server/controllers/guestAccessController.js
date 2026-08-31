@@ -61,6 +61,7 @@ class GuestAccessController {
   static async getMeetingTokens(req, res, next) {
     try {
       const { meetingId } = req.params;
+      const userId = req.user?._id || req.user?.id;
 
       const meeting = await Meeting.findById(meetingId);
       if (!meeting) {

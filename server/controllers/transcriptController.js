@@ -20,6 +20,7 @@ import {
   isOrgE2eeEnforced,
   normalizeEncryptedTranscriptPayload,
   isMeetingTranscriptEncrypted,
+  isOrgE2eeEnforcedForMeeting,
 } from "../utils/transcriptEncryption.js";
 import fs from "fs";
 import path from "path";
@@ -372,6 +373,19 @@ export const uploadTranscriptAudio = async (req, res) => {
       });
     }
 
+    if (await isOrgE2eeEnforcedForMeeting(meeting)) {
+      if (req.file && fs.existsSync(req.file.path)) {
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch {}
+      }
+      return res.status(400).json({
+        success: false,
+        message:
+          "Organization enforces End-to-End Encryption for all transcripts. Plaintext transcript data is not permitted.",
+      });
+    }
+
     // Find active recording transcript
     const transcript = await findInProgressTranscript(meetingId);
 
@@ -445,6 +459,14 @@ export const uploadTranscriptChunk = async (req, res) => {
       return res.status(403).json({
         success: false,
         message: "Forbidden: You don't have access to this meeting",
+      });
+    }
+
+    if (await isOrgE2eeEnforcedForMeeting(meeting)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Organization enforces End-to-End Encryption for all transcripts. Plaintext transcript data is not permitted.",
       });
     }
 
@@ -890,6 +912,14 @@ async function processTranscription(transcriptId) {
       return;
     }
 
+    const meetingRef = transcript.meeting?._id || transcript.meeting;
+    const meeting = await Meeting.findById(meetingRef);
+    if (meeting && (await isOrgE2eeEnforcedForMeeting(meeting))) {
+      throw new Error(
+        "Organization enforces End-to-End Encryption. Plaintext transcription is blocked.",
+      );
+    }
+
     if (!transcript.audioFilePath || !fs.existsSync(transcript.audioFilePath)) {
       throw new Error("Audio file not found");
     }
@@ -922,7 +952,6 @@ async function processTranscription(transcriptId) {
     await indexTranscript(transcript);
 
     // Update meeting with transcript reference
-    const meetingRef = transcript.meeting?._id || transcript.meeting;
     await Meeting.findByIdAndUpdate(meetingRef, {
       transcript: transcriptionResult.fullText,
     });
@@ -1147,12 +1176,24 @@ export const finalizeTranscript = async (req, res) => {
       return sendError(res, 404, "Transcript not found");
     }
 
+    const meeting = await Meeting.findById(meetingId);
+    if (!meeting) {
+      return sendError(res, 404, "Meeting not found");
+    }
+
+    if (await isOrgE2eeEnforcedForMeeting(meeting)) {
+      return sendError(
+        res,
+        400,
+        "Organization enforces End-to-End Encryption for all transcripts. Plaintext transcript data is not permitted.",
+      );
+    }
+
     // Update transcript status
     transcript.status = "completed";
     await transcript.save();
 
     // Update meeting with full transcript
-    const meeting = await Meeting.findById(meetingId);
     if (meeting) {
       meeting.transcript = transcript.fullText;
       await meeting.save();
@@ -1590,32 +1631,12 @@ export const persistCaptionSegments = async (req, res) => {
       );
     }
 
-    // Check if organization enforces E2EE org-wide (#2263)
-    if (meeting.organization) {
-      let org = null;
-      if (
-        typeof meeting.organization === "object" &&
-        meeting.organization !== null
-      ) {
-        org = meeting.organization;
-      } else if (
-        typeof meeting.organization === "string" &&
-        meeting.organization.length === 24 &&
-        /^[0-9a-fA-F]{24}$/.test(meeting.organization)
-      ) {
-        try {
-          org = await Organization.findById(meeting.organization).lean();
-        } catch {
-          org = null;
-        }
-      }
-      if (org && isOrgE2eeEnforced(org)) {
-        return sendError(
-          res,
-          400,
-          "Organization enforces End-to-End Encryption for all transcripts. Plaintext caption data is not permitted.",
-        );
-      }
+    if (await isOrgE2eeEnforcedForMeeting(meeting)) {
+      return sendError(
+        res,
+        400,
+        "Organization enforces End-to-End Encryption for all transcripts. Plaintext caption data is not permitted.",
+      );
     }
 
     let rawSegments = [];
@@ -1659,7 +1680,8 @@ export const persistCaptionSegments = async (req, res) => {
         await resolveSpeakerAttribution(meetingId, raw, user);
 
       const speaker = attrSpeaker;
-      const speakerId = attrSpeakerId || (raw.speakerId ? String(raw.speakerId) : null);
+      const speakerId =
+        attrSpeakerId || (raw.speakerId ? String(raw.speakerId) : null);
       const startTime =
         typeof raw.startTime === "number"
           ? raw.startTime

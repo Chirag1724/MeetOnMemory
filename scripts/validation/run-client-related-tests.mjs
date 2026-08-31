@@ -73,15 +73,20 @@ const ROOT_CLIENT_MAP = {
     "client/src/components/meetings/__tests__/GuestAccessManager.test.jsx",
   "client/src/services/guestAccessApi.js":
     "client/src/components/meetings/__tests__/GuestAccessManager.test.jsx",
- feature/persist-danger-zone-audit
- feature/persist-danger-zone-audit
-
- feature/fix-clerk-offline-sync
- main
-
+  "client/src/components/dashboard/RecurringActionItems.jsx":
+    "client/src/components/dashboard/__tests__/RecurringActionItems.test.jsx",
+  "client/src/hooks/useRecurringActionItems.js":
+    "client/src/hooks/__tests__/useRecurringActionItems.test.jsx",
+  "client/src/api/recurringActionItemApi.js":
+    "client/src/hooks/__tests__/useRecurringActionItems.test.jsx",
+  "client/src/components/common/RecurrencePatternBuilder.jsx":
+    "client/src/components/dashboard/__tests__/RecurringActionItems.test.jsx",
+  "client/src/pages/Dashboard.jsx":
+    "client/src/pages/__tests__/Dashboard.test.jsx",
+  "client/src/pages/Tasks.jsx":
+    "client/src/pages/__tests__/TasksProfileI18n.test.jsx",
   "client/src/config/backendConfig.js":
     "client/src/config/__tests__/backendConfig.test.js",
- main
 };
 
 const directTests = [

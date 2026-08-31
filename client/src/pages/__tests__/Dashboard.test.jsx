@@ -20,6 +20,12 @@ vi.mock("../../components/dashboard/FeedbackTrendChart.jsx", () => ({
   ),
 }));
 
+vi.mock("../../components/dashboard/RecurringActionItems.jsx", () => ({
+  default: () => (
+    <div data-testid="recurring-action-items">Recurring Action Items</div>
+  ),
+}));
+
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key) => key,
@@ -50,6 +56,7 @@ describe("Dashboard", () => {
     expect(screen.getByTestId("navbar")).toBeInTheDocument();
     expect(screen.getByLabelText("Dashboard hero")).toBeInTheDocument();
     expect(screen.getByTestId("feature-cards-grid")).toBeInTheDocument();
+    expect(screen.getByTestId("recurring-action-items")).toBeInTheDocument();
     expect(screen.getByTestId("feedback-trend-chart")).toHaveTextContent(
       "Trends for org-1",
     );

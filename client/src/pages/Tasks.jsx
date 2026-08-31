@@ -18,6 +18,7 @@ import TaskCard from "../components/tasks/TaskCard";
 import TaskDetailsModal from "../components/tasks/TaskDetailsModal";
 import ActionItemDependencyGraph from "../components/tasks/ActionItemDependencyGraph.jsx";
 import Pagination from "../components/meetings/Pagination";
+import RecurringActionItems from "../components/dashboard/RecurringActionItems.jsx";
 
 const Tasks = () => {
   const navigate = useNavigate();
@@ -55,6 +56,10 @@ const Tasks = () => {
           onSelectTask={taskState.setSelectedTask}
           className="mb-8"
         />
+
+        <div className="mb-8">
+          <RecurringActionItems />
+        </div>
 
         <TaskFilterPanel {...taskState} />
         <TaskSortBar

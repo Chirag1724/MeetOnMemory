@@ -1,5 +1,6 @@
 import AiMeetingNote from "../models/aiMeetingNoteModel.js";
 import { escapeRegExp } from "../utils/regexUtils.js";
+import { buildPaginationMeta, parsePagination } from "../utils/pagination.js";
 
 /**
  * Built-in reusable note templates
@@ -297,9 +298,11 @@ export const getNotes = async (req, res) => {
       endDate,
       sortBy = "date",
       sortOrder = "desc",
-      page = 1,
-      limit = 20,
     } = req.query;
+
+    const { page, limit, skip } = parsePagination(req.query, {
+      defaultLimit: 20,
+    });
 
     const query = { organization: organizationId };
 
@@ -326,14 +329,13 @@ export const getNotes = async (req, res) => {
       if (endDate) query.date.$lte = new Date(endDate);
     }
 
-    const skip = (Math.max(1, Number(page)) - 1) * Math.max(1, Number(limit));
     const sort = { [sortBy]: sortOrder === "asc" ? 1 : -1 };
 
     const [notes, total] = await Promise.all([
       AiMeetingNote.find(query)
         .sort(sort)
         .skip(skip)
-        .limit(Number(limit))
+        .limit(limit)
         .populate("meeting", "title date meetingType")
         .populate("createdBy", "name email")
         .populate("reviewedBy", "name email")
@@ -341,16 +343,13 @@ export const getNotes = async (req, res) => {
       AiMeetingNote.countDocuments(query),
     ]);
 
+    const pagination = buildPaginationMeta({ total, page, limit });
+
     return res.status(200).json({
       success: true,
       data: {
         notes,
-        pagination: {
-          total,
-          page: Number(page),
-          limit: Number(limit),
-          pages: Math.ceil(total / Number(limit)) || 1,
-        },
+        pagination,
       },
     });
   } catch (error) {

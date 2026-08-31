@@ -371,22 +371,35 @@ export const getOrgRetentionLeaderboard = async (req, res, next) => {
           totalAttempts: { $sum: 1 },
         },
       },
+      {
+        $lookup: {
+          from: "users",
+          localField: "_id",
+          foreignField: "_id",
+          as: "user",
+        },
+      },
+      { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          "user._id": 1,
+          "user.name": 1,
+          "user.email": 1,
+          "user.role": 1,
+          "user.profilePic": 1,
+          "user.team": 1,
+          avgScore: 1,
+          totalAttempts: 1,
+        },
+      },
       { $sort: { avgScore: -1, totalAttempts: -1 } },
     ]);
 
-    const leaderboard = await Promise.all(
-      rawLeaderboard.map(async (row) => {
-        const User = mongoose.model("User");
-        const user = await User.findById(row._id).select(
-          "name email role profilePic team",
-        );
-        return {
-          user,
-          avgScore: Math.round(row.avgScore),
-          totalAttempts: row.totalAttempts,
-        };
-      }),
-    );
+    const leaderboard = rawLeaderboard.map((row) => ({
+      user: row.user,
+      avgScore: Math.round(row.avgScore),
+      totalAttempts: row.totalAttempts,
+    }));
 
     return res.status(200).json({ success: true, data: leaderboard });
   } catch (err) {

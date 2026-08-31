@@ -84,6 +84,10 @@ import {
   startMeetingOwnershipTransferJob,
   stopMeetingOwnershipTransferJob,
 } from "./jobs/meetingOwnershipTransferJob.js";
+import {
+  startRiskEscalationJob,
+  stopRiskEscalationJob,
+} from "./jobs/riskEscalationJob.js";
 import { createClient } from "redis"; // eslint-disable-line no-unused-vars
 import {
   initDataExportWorker, // eslint-disable-line no-unused-vars
@@ -108,6 +112,13 @@ if (!process.env.JWT_SECRET) {
   console.warn(
     "WARNING: JWT_SECRET environment variable is missing. Shared-link JWT functionality will be disabled.",
   );
+}
+
+if (process.env.NODE_ENV !== "test" && !process.env.TOKEN_ENCRYPTION_KEY) {
+  console.error(
+    "FATAL ERROR: TOKEN_ENCRYPTION_KEY environment variable is required but not set.",
+  );
+  process.exit(1);
 }
 
 // DATABASE & CACHE
@@ -239,6 +250,9 @@ if (process.env.NODE_ENV !== "test") {
 
   // Start Meeting Ownership Transfer job
   startMeetingOwnershipTransferJob();
+
+  // Start Risk Escalation job (#2637)
+  startRiskEscalationJob();
 }
 
 // (AI, Data Export, and Webhook workers are initialized inside server.listen callback)
@@ -259,6 +273,7 @@ const gracefulShutdown = createGracefulShutdown({
     stopActionItemSlaJob();
     stopDecisionReviewReminderJob();
     stopMeetingOwnershipTransferJob();
+    stopRiskEscalationJob();
   },
   closeQueues: shutdownQueues,
   closeDatabase: () => mongoose.connection.close(),

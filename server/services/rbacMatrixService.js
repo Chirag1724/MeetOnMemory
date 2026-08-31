@@ -30,6 +30,15 @@ class RbacMatrixService {
     resourceId,
     requiredPermission,
   }) {
+    // Issue #2570 — Mongoose strips `undefined` from a filter, so an
+    // unscoped query here silently matched an ACL row belonging to *any*
+    // organization. Fail loudly instead of evaluating without a tenant.
+    if (!organizationId) {
+      throw new Error(
+        "Organization context is required to evaluate resource access",
+      );
+    }
+
     // 1. Check direct user ACL
     const userAcl = await ResourceAcl.findOne({
       organizationId,
@@ -104,11 +113,20 @@ class RbacMatrixService {
     permissions,
     grantedBy,
   }) {
+    // Issue #2570 — an unscoped upsert would write an ACL row into no
+    // organization at all.
+    if (!organizationId) {
+      throw new Error("Organization context is required to set a resource ACL");
+    }
+
+    // `granteeType` is part of the identity of a grant: without it a USER
+    // grant and a ROLE grant sharing an id overwrite each other.
     return await ResourceAcl.findOneAndUpdate(
       {
         organizationId,
         resourceType,
         resourceId,
+        granteeType,
         granteeId,
       },
       {

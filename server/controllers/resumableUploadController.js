@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import { pipeline } from "stream/promises";
 import UploadSession from "../models/uploadSessionModel.js";
 import * as MeetingService from "../services/MeetingService.js";
 import {
@@ -164,6 +165,21 @@ export const uploadChunk = async (req, res, next) => {
     const chunkFilePath = path.join(chunksDir, `chunk_${chunkIndex}.tmp`);
     fs.writeFileSync(chunkFilePath, chunkBuffer);
 
+    // Handle early client disconnect (aborted stream)
+    if (req.aborted) {
+      try {
+        fs.unlinkSync(chunkFilePath);
+      } catch (_e) {}
+      return res
+        .status(499)
+        .json({ success: false, message: "Client Closed Request" });
+    }
+    req.on("aborted", () => {
+      try {
+        fs.unlinkSync(chunkFilePath);
+      } catch (_e) {}
+    });
+
     // Clean up multer file path if temporary
     if (req.file?.path && fs.existsSync(req.file.path)) {
       try {
@@ -268,19 +284,14 @@ export const completeResumableUpload = async (req, res, next) => {
       "uploads",
       `assembled_${uploadId}_${session.fileName}`,
     );
-    const writeStream = fs.createWriteStream(assembledFilePath);
 
     for (let i = 0; i < session.totalChunks; i++) {
       const chunkPath = path.join(chunksDir, `chunk_${i}.tmp`);
-      const chunkBuffer = fs.readFileSync(chunkPath);
-      writeStream.write(chunkBuffer);
+      const appendStream = fs.createWriteStream(assembledFilePath, {
+        flags: "a",
+      });
+      await pipeline(fs.createReadStream(chunkPath), appendStream);
     }
-    writeStream.end();
-
-    await new Promise((resolve, reject) => {
-      writeStream.on("finish", resolve);
-      writeStream.on("error", reject);
-    });
 
     // Integrity Check: Assembled size must match expected fileSize
     const assembledStat = fs.statSync(assembledFilePath);

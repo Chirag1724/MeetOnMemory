@@ -67,22 +67,81 @@ class ActionItemSlaService {
     return breach;
   }
 
-  /**
-   * Detect SLA breaches for an organization
-   */
   async detectBreaches(organizationId) {
     const config = await this.getConfig(organizationId);
     if (!config.enabled) return { newBreaches: 0 };
 
-    const actionItems = await ActionItem.find({
+    const cursor = ActionItem.find({
       organization: organizationId,
       status: { $nin: ["cancelled", "superseded"] },
-    });
+    }).cursor();
 
     const now = new Date();
     let newBreachesCount = 0;
 
-    for (const item of actionItems) {
+    let actionItemUpdates = [];
+    let breachDocsToInsert = [];
+    let notificationsToEmit = [];
+
+    const flushBatch = async () => {
+      const promises = [];
+
+      if (actionItemUpdates.length > 0) {
+        promises.push(ActionItem.bulkWrite(actionItemUpdates));
+      }
+
+      if (breachDocsToInsert.length > 0) {
+        const inserts = breachDocsToInsert.map((b) => ({
+          insertOne: { document: b },
+        }));
+        promises.push(
+          ActionItemSlaBreach.bulkWrite(inserts, { ordered: false })
+            .then((res) => {
+              if (res.insertedIds) {
+                Object.keys(res.insertedIds).forEach((index) => {
+                  const docIndex = parseInt(index);
+                  const doc = breachDocsToInsert[docIndex];
+                  eventBus.emit("sla.breach.detected", {
+                    organizationId: doc.organization,
+                    breachId: res.insertedIds[index],
+                    actionItemId: doc.actionItem,
+                  });
+                });
+                newBreachesCount += Object.keys(res.insertedIds).length;
+              }
+            })
+            .catch((err) => {
+              if (err.result && err.result.insertedIds) {
+                Object.keys(err.result.insertedIds).forEach((index) => {
+                  const docIndex = parseInt(index);
+                  const doc = breachDocsToInsert[docIndex];
+                  eventBus.emit("sla.breach.detected", {
+                    organizationId: doc.organization,
+                    breachId: err.result.insertedIds[index],
+                    actionItemId: doc.actionItem,
+                  });
+                });
+                newBreachesCount += Object.keys(err.result.insertedIds).length;
+              }
+            }),
+        );
+      }
+
+      if (notificationsToEmit.length > 0) {
+        const notifPromises = notificationsToEmit.map((n) =>
+          createNotification(...n),
+        );
+        promises.push(Promise.allSettled(notifPromises));
+      }
+
+      await Promise.allSettled(promises);
+
+      actionItemUpdates = [];
+      breachDocsToInsert = [];
+      notificationsToEmit = [];
+    };
+
+    for await (const item of cursor) {
       const targets = config.targets[item.priority] || config.targets.medium;
 
       // Skip active alerting if snoozed
@@ -91,6 +150,7 @@ class ActionItemSlaService {
       }
 
       const isResolved = ["resolved", "completed"].includes(item.status);
+      let needsUpdate = false;
 
       // Check custom warning offsets before breach
       if (item.customWarningOffsets && item.customWarningOffsets.length > 0) {
@@ -119,7 +179,7 @@ class ActionItemSlaService {
             !item.warningsSent.includes(offset)
           ) {
             if (item.assignee) {
-              await createNotification(
+              notificationsToEmit.push([
                 item.assignee,
                 "SLA Response Warning Alert",
                 `The task "${item.text}" is approaching its Response SLA limit (${targets.targetResponseHours}h).`,
@@ -127,10 +187,10 @@ class ActionItemSlaService {
                 `/followup/tasks/${item._id}`,
                 "View Task",
                 { actionItemId: item._id },
-              );
+              ]);
             }
             item.warningsSent.push(offset);
-            await item.save();
+            needsUpdate = true;
           }
 
           // Resolution Warning
@@ -141,7 +201,7 @@ class ActionItemSlaService {
             !item.warningsSent.includes(offset)
           ) {
             if (item.assignee) {
-              await createNotification(
+              notificationsToEmit.push([
                 item.assignee,
                 "SLA Resolution Warning Alert",
                 `The task "${item.text}" is approaching its Resolution SLA limit (${targets.targetResolutionHours}h).`,
@@ -149,12 +209,21 @@ class ActionItemSlaService {
                 `/followup/tasks/${item._id}`,
                 "View Task",
                 { actionItemId: item._id },
-              );
+              ]);
             }
             item.warningsSent.push(offset);
-            await item.save();
+            needsUpdate = true;
           }
         }
+      }
+
+      if (needsUpdate) {
+        actionItemUpdates.push({
+          updateOne: {
+            filter: { _id: item._id },
+            update: { $set: { warningsSent: item.warningsSent } },
+          },
+        });
       }
 
       // Calculate actual hours since creation
@@ -165,14 +234,15 @@ class ActionItemSlaService {
         item.status === "open" &&
         hoursSinceCreation > targets.targetResponseHours
       ) {
-        const recorded = await this._recordBreach(
-          item,
-          organizationId,
-          "response",
-          targets.targetResponseHours,
-          hoursSinceCreation,
-        );
-        if (recorded) newBreachesCount++;
+        breachDocsToInsert.push({
+          actionItem: item._id,
+          organization: organizationId,
+          assignee: item.assignee,
+          priority: item.priority,
+          breachType: "response",
+          targetHours: targets.targetResponseHours,
+          actualHours: Math.round(hoursSinceCreation * 10) / 10,
+        });
       }
 
       // 2. Check Resolution SLA (Time to move to 'resolved' or 'completed')
@@ -188,16 +258,27 @@ class ActionItemSlaService {
         (!isResolved && hoursSinceCreation > targets.targetResolutionHours) ||
         (isResolved && resolutionHours > targets.targetResolutionHours)
       ) {
-        const recorded = await this._recordBreach(
-          item,
-          organizationId,
-          "resolution",
-          targets.targetResolutionHours,
-          resolutionHours,
-        );
-        if (recorded) newBreachesCount++;
+        breachDocsToInsert.push({
+          actionItem: item._id,
+          organization: organizationId,
+          assignee: item.assignee,
+          priority: item.priority,
+          breachType: "resolution",
+          targetHours: targets.targetResolutionHours,
+          actualHours: Math.round(resolutionHours * 10) / 10,
+        });
+      }
+
+      if (
+        actionItemUpdates.length >= 100 ||
+        breachDocsToInsert.length >= 100 ||
+        notificationsToEmit.length >= 100
+      ) {
+        await flushBatch();
       }
     }
+
+    await flushBatch();
 
     return { newBreaches: newBreachesCount };
   }
@@ -219,40 +300,6 @@ class ActionItemSlaService {
     }
 
     return { totalBreaches };
-  }
-
-  async _recordBreach(
-    actionItem,
-    organizationId,
-    breachType,
-    targetHours,
-    actualHours,
-  ) {
-    try {
-      const breach = await ActionItemSlaBreach.create({
-        actionItem: actionItem._id,
-        organization: organizationId,
-        assignee: actionItem.assignee,
-        priority: actionItem.priority,
-        breachType,
-        targetHours,
-        actualHours: Math.round(actualHours * 10) / 10,
-      });
-
-      eventBus.emit("sla.breach.detected", {
-        organizationId,
-        breachId: breach._id,
-        actionItemId: actionItem._id,
-      });
-
-      return true;
-    } catch (error) {
-      // Ignore duplicate key errors (11000) as it means breach was already recorded
-      if (error.code !== 11000) {
-        console.error("Error recording SLA breach:", error);
-      }
-      return false;
-    }
   }
 
   /**

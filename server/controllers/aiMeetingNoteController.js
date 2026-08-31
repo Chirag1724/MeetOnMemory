@@ -1,6 +1,15 @@
 import AiMeetingNote from "../models/aiMeetingNoteModel.js";
+import Meeting from "../models/meetingModel.js";
 import { escapeRegExp } from "../utils/regexUtils.js";
 import { buildPaginationMeta, parsePagination } from "../utils/pagination.js";
+import {
+  createCircuitBreaker,
+  callWithResilience,
+} from "../utils/aiResilience.js";
+
+const aiNoteBreaker = createCircuitBreaker({
+  name: "ai-meeting-note-generator",
+});
 
 /**
  * Built-in reusable note templates
@@ -449,11 +458,35 @@ export const generateAiNote = async (req, res) => {
       ...new Set([...(tags || []), ...(template.defaultTags || [])]),
     ];
 
-    const synthesis = synthesizeAiNoteContent(
-      rawContent,
-      templateUsed,
-      title.trim(),
-    );
+    let synthesis;
+    try {
+      synthesis = await callWithResilience(
+        async () => {
+          return synthesizeAiNoteContent(
+            rawContent,
+            templateUsed,
+            title.trim(),
+          );
+        },
+        {
+          breaker: aiNoteBreaker,
+          timeoutMs: 30000,
+          label: "AI Note Synthesis",
+        },
+      );
+    } catch (err) {
+      console.error("AI Note generation failed:", err);
+      if (meeting) {
+        await Meeting.findByIdAndUpdate(meeting, {
+          status: "failed_permanently",
+        });
+      }
+      return res.status(503).json({
+        success: false,
+        message: "AI Note generation failed due to timeout or rate limit",
+        error: err.message,
+      });
+    }
 
     const note = new AiMeetingNote({
       organization: organizationId,

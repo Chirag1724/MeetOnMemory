@@ -8,6 +8,7 @@ import ProtectedRoutes from "./routes/ProtectedRoutes.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import ScrollNavigator from "./components/ScrollNavigator";
 import FloatingAssistant from "./components/FloatingAssistant.jsx";
+import GlobalVoiceAssistant from "./components/GlobalVoiceAssistant.jsx";
 import BadgeNotification from "./components/gamification/BadgeNotification.jsx";
 import OfflineBanner from "./components/OfflineBanner.jsx";
 import Footer from "./components/Footer.jsx";
@@ -15,7 +16,6 @@ import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import AppContent from "./context/AppContent.js";
 
 const NotFound = lazy(() => import("./pages/NotFound.jsx"));
-const RiskRegister = lazy(() => import("./pages/RiskRegister.jsx"));
 
 const App = () => {
   const location = useLocation();
@@ -62,14 +62,6 @@ const App = () => {
             <Routes>
               {PublicRoutes}
               {ProtectedRoutes}
-              <Route
-                path="/risks"
-                element={
-                  <ProtectedRoute>
-                    <RiskRegister />
-                  </ProtectedRoute>
-                }
-              />
               {/* ✅ Fallback route — send unknown routes to NotFound */}
               <Route path="*" element={<NotFound />} />
             </Routes>
@@ -81,6 +73,9 @@ const App = () => {
 
         {/* Global AI Assistant floating workspace */}
         {isLoggedin && <FloatingAssistant />}
+
+        {/* Global Voice Assistant (Hey Memory) */}
+        {isLoggedin && <GlobalVoiceAssistant />}
 
         {/* Gamification Badge Notifications */}
         {isLoggedin && <BadgeNotification />}

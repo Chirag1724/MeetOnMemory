@@ -16,9 +16,10 @@ import fs from "fs";
 import path from "path";
 import { z } from "zod";
 import mongoose from "mongoose";
-import Meeting from "../models/meetingModel.js"; // eslint-disable-line no-unused-vars
+import Meeting from "../models/meetingModel.js";
 import * as MeetingService from "../services/MeetingService.js";
 import * as MeetingInviteService from "../services/MeetingInviteService.js";
+import * as MeetingCloneService from "../services/meetingCloneService.js";
 import { ValidationError, UnauthorizedError } from "../utils/errors.js";
 import AuditService from "../services/AuditService.js";
 import { sendSuccess } from "../utils/responseHandler.js";
@@ -964,6 +965,38 @@ export const getRawTranscript = async (req, res, next) => {
       res,
       { original },
       "Original unredacted contents decrypted successfully",
+    );
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const cloneMeeting = async (req, res, next) => {
+  try {
+    const meetingId = req.params.meetingId;
+    const userId = req.user._id;
+
+    const options = {
+      includeAgenda: req.body.includeAgenda !== false,
+      includeParticipants: req.body.includeParticipants !== false,
+      includeCustomFields: req.body.includeCustomFields !== false,
+    };
+
+    if (req.body.newDate) {
+      options.newDate = new Date(req.body.newDate);
+    }
+
+    const newMeeting = await MeetingCloneService.cloneMeeting(
+      meetingId,
+      userId,
+      options,
+    );
+
+    return sendSuccess(
+      res,
+      { meeting: newMeeting },
+      "Meeting cloned successfully",
+      201,
     );
   } catch (err) {
     next(err);

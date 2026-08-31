@@ -18,10 +18,13 @@ const ALGORITHM = "aes-256-gcm";
  * Key matrix and failure modes: docs/security-and-health.md#encryption-keys
  */
 const getEncryptionKey = () => {
-  const key =
-    process.env.TOKEN_ENCRYPTION_KEY || "default_dev_token_encryption_key_32";
+  const key = process.env.TOKEN_ENCRYPTION_KEY;
+  if (!key && process.env.NODE_ENV !== "test") {
+    throw new Error("TOKEN_ENCRYPTION_KEY is required but not set.");
+  }
+  const effectiveKey = key || "default_dev_token_encryption_key_32";
   // Always derive a 32-byte key via SHA-256 to prevent crashes
-  return crypto.createHash("sha256").update(key).digest();
+  return crypto.createHash("sha256").update(effectiveKey).digest();
 };
 
 /**

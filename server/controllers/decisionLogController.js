@@ -137,3 +137,25 @@ export const exportLog = async (req, res) => {
     res.status(500).json({ error: "Failed to export decision log" });
   }
 };
+
+export const getDecisionAnalytics = async (req, res) => {
+  try {
+    const filters = {
+      status: req.query.status,
+      outcome: req.query.outcome,
+      startDate: req.query.startDate,
+      endDate: req.query.endDate,
+      teamId: req.query.teamId,
+    };
+    const analytics = await decisionLogService.getDecisionAnalytics(
+      req.organization._id,
+      filters,
+    );
+    res.status(200).json({ success: true, ...analytics });
+  } catch (error) {
+    console.error("Error in getDecisionAnalytics:", error);
+    res
+      .status(500)
+      .json({ success: false, error: "Failed to fetch decision analytics" });
+  }
+};

@@ -127,6 +127,9 @@
       "name": "Decision Log"
     },
     {
+      "name": "Decision Logs"
+    },
+    {
       "name": "Decisions"
     },
     {
@@ -209,6 +212,9 @@
     },
     {
       "name": "Knowledge"
+    },
+    {
+      "name": "Meeting Budgets"
     },
     {
       "name": "Meeting Cost"
@@ -386,6 +392,9 @@
     },
     {
       "name": "Translations"
+    },
+    {
+      "name": "Voice Search"
     },
     {
       "name": "Webhooks"
@@ -2672,6 +2681,32 @@
           }
         }
       },
+      "put": {
+        "tags": ["Meetings"],
+        "summary": "PUT /api/meetings/:meetingId/checklist",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
       "get": {
         "tags": ["Meetings"],
         "summary": "GET /api/meetings/:meetingId/checklist",
@@ -3157,6 +3192,62 @@
           },
           "401": {
             "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/playbooks/{id}/restore/{version}": {
+      "put": {
+        "tags": ["Playbooks"],
+        "summary": "PUT /api/playbooks/{id}/restore/{version}",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/playbooks/{id}/apply": {
+      "post": {
+        "tags": ["Playbooks"],
+        "summary": "POST /api/playbooks/{id}/apply",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
           }
         }
       }
@@ -5853,6 +5944,70 @@
         }
       }
     },
+    "/api/meeting-budgets": {
+      "post": {
+        "tags": ["Meeting Budgets"],
+        "summary": "POST /api/meeting-budgets",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": ["Meeting Budgets"],
+        "summary": "GET /api/meeting-budgets",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/meeting-budgets/{id}/summary": {
+      "get": {
+        "tags": ["Meeting Budgets"],
+        "summary": "GET /api/meeting-budgets/{id}/summary",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
     "/api/gemini/insights": {
       "post": {
         "tags": ["Gemini"],
@@ -7705,6 +7860,34 @@
       "post": {
         "tags": ["Assistant"],
         "summary": "POST /api/assistant/sessions/{id}/message",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/voice-search/query": {
+      "post": {
+        "tags": ["Voice Search"],
+        "summary": "POST /api/voice-search/query",
         "security": [
           {
             "bearerAuth": []
@@ -12261,6 +12444,44 @@
         }
       }
     },
+    "/api/decision-log/export": {
+      "get": {
+        "tags": ["Decision Log"],
+        "summary": "GET /api/decision-log/export",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/decision-log/analytics": {
+      "get": {
+        "tags": ["Decision Log"],
+        "summary": "GET /api/decision-log/analytics",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
     "/api/decision-log/timeline": {
       "get": {
         "tags": ["Decision Log"],
@@ -12351,6 +12572,273 @@
                 "type": "object"
               }
             }
+          }
+        }
+      }
+    },
+    "/api/decision-log/{id}": {
+      "put": {
+        "tags": ["Decision Log"],
+        "summary": "PUT /api/decision-log/{id}",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Decision Log"],
+        "summary": "DELETE /api/decision-log/{id}",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/decision-logs": {
+      "get": {
+        "tags": ["Decision Logs"],
+        "summary": "GET /api/decision-logs",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Decision Logs"],
+        "summary": "POST /api/decision-logs",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/decision-logs/export": {
+      "get": {
+        "tags": ["Decision Logs"],
+        "summary": "GET /api/decision-logs/export",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/decision-logs/analytics": {
+      "get": {
+        "tags": ["Decision Logs"],
+        "summary": "GET /api/decision-logs/analytics",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/decision-logs/timeline": {
+      "get": {
+        "tags": ["Decision Logs"],
+        "summary": "GET /api/decision-logs/timeline",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/decision-logs/overdue": {
+      "get": {
+        "tags": ["Decision Logs"],
+        "summary": "GET /api/decision-logs/overdue",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/decision-logs/{id}/outcome": {
+      "put": {
+        "tags": ["Decision Logs"],
+        "summary": "PUT /api/decision-logs/{id}/outcome",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/decision-logs/{id}/link-action-items": {
+      "put": {
+        "tags": ["Decision Logs"],
+        "summary": "PUT /api/decision-logs/{id}/link-action-items",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/decision-logs/{id}": {
+      "put": {
+        "tags": ["Decision Logs"],
+        "summary": "PUT /api/decision-logs/{id}",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Decision Logs"],
+        "summary": "DELETE /api/decision-logs/{id}",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         }
       }
@@ -18105,6 +18593,62 @@
         }
       }
     },
+    "/api/async-meetings/{meetingId}/convert": {
+      "post": {
+        "tags": ["Async Meetings"],
+        "summary": "POST /api/async-meetings/{meetingId}/convert",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/async-meetings/{meetingId}/response": {
+      "post": {
+        "tags": ["Async Meetings"],
+        "summary": "POST /api/async-meetings/{meetingId}/response",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/debrief/session": {
       "post": {
         "tags": ["Debrief"],
@@ -21179,6 +21723,62 @@
         }
       }
     },
+    "/api/weekly-insights/{orgId}/insights/{insightId}/share": {
+      "post": {
+        "tags": ["Weekly Insights"],
+        "summary": "POST /api/weekly-insights/{orgId}/insights/{insightId}/share",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/weekly-insights/{orgId}/insights/{insightId}/email": {
+      "post": {
+        "tags": ["Weekly Insights"],
+        "summary": "POST /api/weekly-insights/{orgId}/insights/{insightId}/email",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/meeting-risks": {
       "post": {
         "tags": ["Meeting Risks"],
@@ -21793,6 +22393,25 @@
                 "type": "object"
               }
             }
+          }
+        }
+      }
+    },
+    "/api/observers/{meetingId}/pending": {
+      "get": {
+        "tags": ["Observers"],
+        "summary": "GET /api/observers/{meetingId}/pending",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         }
       }

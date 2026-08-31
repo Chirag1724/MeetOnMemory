@@ -22,6 +22,12 @@ router.get(
 );
 
 router.get(
+  "/analytics",
+  requirePermission("knowledge", "view"),
+  decisionLogController.getDecisionAnalytics,
+);
+
+router.get(
   "/timeline",
   requirePermission("knowledge", "view"),
   decisionLogController.getDecisionTimeline,

@@ -71,6 +71,9 @@ const DecisionDependencyMatrix = lazy(
   () => import("../pages/DecisionDependencyMatrix.jsx"),
 );
 const DecisionLog = lazy(() => import("../pages/DecisionLog.jsx"));
+const DecisionTrackingDashboard = lazy(
+  () => import("../pages/DecisionTrackingDashboard.jsx"),
+);
 const PolicyCompliance = lazy(() => import("../pages/PolicyCompliance.jsx"));
 const DlpComplianceConsole = lazy(
   () => import("../pages/DlpComplianceConsole.jsx"),
@@ -96,6 +99,9 @@ const AttendanceAnalytics = lazy(
   () => import("../pages/AttendanceAnalytics.jsx"),
 );
 const RsvpInbox = lazy(() => import("../pages/RsvpInbox.jsx"));
+const MeetingCostsTrackerPage = lazy(
+  () => import("../pages/MeetingCostsTrackerPage.jsx"),
+);
 const MeetingCostAnalytics = lazy(
   () => import("../pages/MeetingCostAnalytics.jsx"),
 );
@@ -473,6 +479,30 @@ const ProtectedRoutes = (
       element={
         <ProtectedRoute resource="knowledge" action="view">
           <DecisionLog />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/decisions/dashboard"
+      element={
+        <ProtectedRoute resource="knowledge" action="view">
+          <DecisionTrackingDashboard />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/analytics/decisions"
+      element={
+        <ProtectedRoute resource="knowledge" action="view">
+          <DecisionTrackingDashboard />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/decision-tracking"
+      element={
+        <ProtectedRoute resource="knowledge" action="view">
+          <DecisionTrackingDashboard />
         </ProtectedRoute>
       }
     />

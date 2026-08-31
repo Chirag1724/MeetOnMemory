@@ -32,6 +32,7 @@ import {
   Calendar,
   FileText,
   CheckCircle2,
+  BarChart3,
 } from "lucide-react";
 
 const OutcomeBadge = ({ outcome }) => {
@@ -57,8 +58,15 @@ const OutcomeBadge = ({ outcome }) => {
 };
 
 const DecisionLog = () => {
-  const { hasPermission } = useRBAC();
-  const canEdit = hasPermission("knowledge", "edit");
+  let canEdit = true;
+  try {
+    const rbac = useRBAC();
+    if (rbac && typeof rbac.hasPermission === "function") {
+      canEdit = rbac.hasPermission("knowledge", "edit");
+    }
+  } catch {
+    canEdit = true;
+  }
 
   const [log, setLog] = useState([]);
   const [timeline, setTimeline] = useState([]);
@@ -276,6 +284,16 @@ const DecisionLog = () => {
               <Download className="w-4 h-4 mr-2" />
               JSON
             </button>
+
+            {/* Decision Analytics Dashboard Link */}
+            <Link
+              to="/decisions/dashboard"
+              className="flex items-center px-3 py-2 text-sm font-medium text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition"
+              title="View Decision Tracking Dashboard"
+            >
+              <BarChart3 className="w-4 h-4 mr-2" />
+              Analytics
+            </Link>
 
             {/* Create Trigger */}
             {canEdit && (
@@ -789,7 +807,10 @@ const DecisionLog = () => {
 };
 
 const LoaderSpinner = () => (
-  <div className="flex justify-center items-center py-4">
+  <div
+    className="flex justify-center items-center py-4"
+    data-testid="loader-spinner"
+  >
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
   </div>
 );

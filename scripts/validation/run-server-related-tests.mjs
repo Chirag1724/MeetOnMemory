@@ -102,33 +102,26 @@ const vitestOwnedSources = new Set([
   "server/middleware/authMiddleware.js",
   "server/controllers/keyMomentController.js",
   "server/routes/keyMomentRoutes.js",
-feature/persist-danger-zone-audit
- feature/persist-danger-zone-audit
   "server/routes/auditRoutes.js",
-  "server/routes/index.js",
-]);
-const VITEST_SOURCE_TEST_MAP = {
-  "server/routes/auditRoutes.js": "server/__tests__/audit.test.js",
-
- feature/fix-clerk-offline-sync
-  "server/routes/index.js",
-]);
-const VITEST_SOURCE_TEST_MAP = {
- main
-  "server/routes/index.js":
-    "server/tests/breakoutRoomController.vitest.test.js",
-
   "server/controllers/standupController.js",
   "server/routes/standupRoutes.js",
+  "server/controllers/decisionLogController.js",
+  "server/routes/decisionLogRoutes.js",
+  "server/services/decisionLogService.js",
   "server/routes/index.js",
 ]);
 const VITEST_SOURCE_TEST_MAP = {
+  "server/controllers/decisionLogController.js":
+    "server/tests/decisionLogAnalytics.vitest.test.js",
+  "server/routes/decisionLogRoutes.js":
+    "server/tests/decisionLogAnalytics.vitest.test.js",
+  "server/services/decisionLogService.js":
+    "server/tests/decisionLogAnalytics.vitest.test.js",
+  "server/routes/auditRoutes.js": "server/__tests__/audit.test.js",
   "server/controllers/standupController.js":
     "server/tests/standupController.vitest.test.js",
   "server/routes/standupRoutes.js":
     "server/tests/standupController.vitest.test.js",
-  "server/routes/index.js": "server/tests/standupController.vitest.test.js",
- main
   "server/controllers/breakoutRoomController.js":
     "server/tests/breakoutRoomController.vitest.test.js",
   "server/routes/breakoutRoomRoutes.js":

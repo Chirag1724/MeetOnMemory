@@ -73,22 +73,21 @@ const ROOT_CLIENT_MAP = {
     "client/src/components/meetings/__tests__/GuestAccessManager.test.jsx",
   "client/src/services/guestAccessApi.js":
     "client/src/components/meetings/__tests__/GuestAccessManager.test.jsx",
- feature/persist-danger-zone-audit
- feature/persist-danger-zone-audit
-
- feature/fix-clerk-offline-sync
- main
-
   "client/src/config/backendConfig.js":
     "client/src/config/__tests__/backendConfig.test.js",
- main
+  "client/src/pages/MeetingBriefing.jsx":
+    "client/src/pages/__tests__/MeetingBriefing.test.jsx",
+  "client/src/services/briefingApi.js":
+    "client/src/pages/__tests__/MeetingBriefing.test.jsx",
 };
 
 const directTests = [
-  ...clientFiles.filter((file) => /(\.test\.|\.spec\.|__tests__)/.test(file)),
-  ...clientFiles
-    .filter((file) => ROOT_CLIENT_MAP[file])
-    .map((file) => ROOT_CLIENT_MAP[file]),
+  ...new Set([
+    ...clientFiles.filter((file) => /(\.test\.|\.spec\.|__tests__)/.test(file)),
+    ...clientFiles
+      .filter((file) => ROOT_CLIENT_MAP[file])
+      .map((file) => ROOT_CLIENT_MAP[file]),
+  ]),
 ];
 const relatedSources = clientFiles.filter(
   (file) => !directTests.includes(file) && !ROOT_CLIENT_MAP[file],
@@ -109,7 +108,7 @@ if (clientFiles.length === 0) {
 
 if (directTests.length > 0) {
   runNpx(
-    `vitest run --passWithNoTests ${quoteFiles(
+    `vitest run --pool=forks --passWithNoTests ${quoteFiles(
       directTests.map((file) => file.slice("client/".length)),
     )}`,
     {
@@ -120,7 +119,7 @@ if (directTests.length > 0) {
 
 if (relatedSources.length > 0) {
   runNpx(
-    `vitest related --passWithNoTests ${quoteFiles(
+    `vitest related --pool=forks --passWithNoTests ${quoteFiles(
       relatedSources.map((file) => file.slice("client/".length)),
     )}`,
     {

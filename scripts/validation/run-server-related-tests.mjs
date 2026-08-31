@@ -10,7 +10,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 
 const JEST =
-  "node --experimental-vm-modules node_modules/jest/bin/jest.js --forceExit";
+  "node --max-old-space-size=4096 --experimental-vm-modules node_modules/jest/bin/jest.js --forceExit";
 const serverCwd = `${repoRoot}/server`;
 
 const TEST_FILE_REGEX = /(\.test\.|\.spec\.|__tests__)/;
@@ -102,33 +102,23 @@ const vitestOwnedSources = new Set([
   "server/middleware/authMiddleware.js",
   "server/controllers/keyMomentController.js",
   "server/routes/keyMomentRoutes.js",
-feature/persist-danger-zone-audit
- feature/persist-danger-zone-audit
   "server/routes/auditRoutes.js",
-  "server/routes/index.js",
-]);
-const VITEST_SOURCE_TEST_MAP = {
-  "server/routes/auditRoutes.js": "server/__tests__/audit.test.js",
-
- feature/fix-clerk-offline-sync
-  "server/routes/index.js",
-]);
-const VITEST_SOURCE_TEST_MAP = {
- main
-  "server/routes/index.js":
-    "server/tests/breakoutRoomController.vitest.test.js",
-
   "server/controllers/standupController.js",
   "server/routes/standupRoutes.js",
+  "server/controllers/preMeetingBriefingController.js",
+  "server/routes/preMeetingBriefingRoutes.js",
   "server/routes/index.js",
 ]);
 const VITEST_SOURCE_TEST_MAP = {
+  "server/controllers/preMeetingBriefingController.js":
+    "server/tests/preMeetingBriefingController.vitest.test.js",
+  "server/routes/preMeetingBriefingRoutes.js":
+    "server/tests/preMeetingBriefingController.vitest.test.js",
+  "server/routes/auditRoutes.js": "server/__tests__/audit.test.js",
   "server/controllers/standupController.js":
     "server/tests/standupController.vitest.test.js",
   "server/routes/standupRoutes.js":
     "server/tests/standupController.vitest.test.js",
-  "server/routes/index.js": "server/tests/standupController.vitest.test.js",
- main
   "server/controllers/breakoutRoomController.js":
     "server/tests/breakoutRoomController.vitest.test.js",
   "server/routes/breakoutRoomRoutes.js":

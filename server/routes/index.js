@@ -280,7 +280,14 @@ router.use("/api/gamification", gamificationRoutes);
 router.use("/api/action-items", actionItemsRoutes);
 
 import preMeetingBriefingRoutes from "./preMeetingBriefingRoutes.js";
-router.use("/api/briefings", preMeetingBriefingRoutes);
+router.use(
+  [
+    "/api/briefings",
+    "/api/meeting/:meetingId/briefing",
+    "/api/meetings/:meetingId/briefing",
+  ],
+  preMeetingBriefingRoutes,
+);
 
 import escalationRoutes from "./escalationRoutes.js";
 router.use(["/api/escalations", "/api/escalation-policies"], escalationRoutes);

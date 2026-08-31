@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   ChevronRight,
-  UserCheck,
 } from "lucide-react";
 import { io } from "socket.io-client";
 import { toast } from "react-toastify";

@@ -7,9 +7,10 @@ export const searchApi = {
   /**
    * Voice-powered semantic search
    */
-  voiceSearch: async (query) => {
+  voiceSearch: async (query, config = {}) => {
     const response = await apiClient.get("/api/search/voice", {
-      params: { query: query.trim() },
+      ...config,
+      params: { ...config.params, query: query.trim() },
     });
     return response.data;
   },
@@ -17,24 +18,32 @@ export const searchApi = {
   /**
    * Federated knowledge search across workspaces
    */
-  federatedSearch: async (payload) => {
-    const response = await apiClient.post("/api/search/federated", payload);
+  federatedSearch: async (payload, config = {}) => {
+    const response = await apiClient.post(
+      "/api/search/federated",
+      payload,
+      config,
+    );
     return response.data;
   },
 
   /**
    * Hybrid vector + graph search
    */
-  hybridSearch: async (payload) => {
-    const response = await apiClient.post("/api/search/hybrid", payload);
+  hybridSearch: async (payload, config = {}) => {
+    const response = await apiClient.post(
+      "/api/search/hybrid",
+      payload,
+      config,
+    );
     return response.data;
   },
 
   /**
    * Semantic vector search
    */
-  semanticSearch: async (payload) => {
-    const response = await apiClient.post("/api/search", payload);
+  semanticSearch: async (payload, config = {}) => {
+    const response = await apiClient.post("/api/search", payload, config);
     return response.data;
   },
 };

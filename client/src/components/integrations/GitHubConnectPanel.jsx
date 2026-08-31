@@ -2,11 +2,16 @@ import React, { useEffect } from "react";
 import useGitHubIntegration from "../../hooks/useGitHubIntegration";
 import { useLocation, useNavigate } from "react-router-dom";
 
-const GitHubConnectPanel = ({ organizationId }) => {
+const GitHubConnectPanel = ({
+  organizationId,
+  canEdit = true,
+  isLinking,
+  setIsLinking,
+}) => {
   const {
     isConnected,
     repositoryFullName,
-    isLoading,
+    isLoading: loading,
     error,
     connect,
     disconnect,
@@ -47,18 +52,28 @@ const GitHubConnectPanel = ({ organizationId }) => {
           </div>
         </div>
 
-        {isLoading ? (
+        {loading ? (
           <div className="h-8 w-24 bg-gray-200 animate-pulse rounded"></div>
         ) : isConnected ? (
           <button
-            onClick={disconnect}
+            onClick={async () => {
+              setIsLinking?.(true);
+              await disconnect();
+              setIsLinking?.(false);
+            }}
+            disabled={!canEdit || loading || isLinking}
             className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 dark:text-red-400 dark:bg-red-900/30 rounded-lg transition-colors"
           >
             Disconnect
           </button>
         ) : (
           <button
-            onClick={connect}
+            onClick={async () => {
+              setIsLinking?.(true);
+              await connect();
+              setIsLinking?.(false);
+            }}
+            disabled={!canEdit || loading || isLinking}
             className="px-4 py-2 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 rounded-lg transition-colors"
           >
             Connect GitHub

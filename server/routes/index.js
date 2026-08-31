@@ -221,4 +221,10 @@ router.use("/api/engagement", participantEngagementRoutes);
 import meetingPatternRoutes from "./meetingPatternRoutes.js";
 router.use("/api/patterns", meetingPatternRoutes);
 
+// Icebreaker generate / select / retrieve (Issue #2622).
+// Client calls /api/icebreakers/*; this mount connects those calls to the
+// controller.  Without this registration every icebreaker request 404'd.
+import icebreakerRoutes from "./icebreakerRoutes.js";
+router.use("/api/icebreakers", icebreakerRoutes);
+
 export default router;

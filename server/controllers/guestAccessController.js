@@ -68,36 +68,6 @@ class GuestAccessController {
         return next(new NotFoundError("Meeting not found"));
       }
 
-      const isHost =
-        meeting.uploadedBy?.toString() === userId?.toString() ||
-        meeting.host?.toString() === userId?.toString();
-      const isAdmin =
-        req.user?.role === "admin" ||
-        req.user?.role === "owner" ||
-        req.user?.isAdmin;
-      const isOrgMember =
-        req.user?.organization &&
-        meeting.organization &&
-        req.user.organization.toString() === meeting.organization.toString();
-
-      // Check organization membership first to prevent cross-tenant enumeration
-      if (!isOrgMember) {
-        return next(
-          new ForbiddenError(
-            "Unauthorized to view guest tokens for this meeting",
-          ),
-        );
-      }
-
-      // Check host or admin authorization
-      if (!isHost && !isAdmin) {
-        return next(
-          new ForbiddenError(
-            "Only authorized hosts or admins can list guest tokens for this meeting",
-          ),
-        );
-      }
-
       const tokens = await GuestAccessService.getMeetingTokens(meetingId);
       return res.status(200).json(tokens);
     } catch (error) {

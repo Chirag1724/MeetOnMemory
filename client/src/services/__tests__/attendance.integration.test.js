@@ -16,7 +16,7 @@ describe("Meeting Attendance Client Service Integration Tests (#2666)", () => {
   });
 
   describe("Contract Assertions", () => {
-    it("should call GET /api/meetings/:meetingId/attendance when fetching attendance", async () => {
+    it("should call GET /meetings/:meetingId/attendance when fetching attendance", async () => {
       const mockResponse = {
         data: [{ email: "user@example.com", status: "invited" }],
       };
@@ -24,13 +24,11 @@ describe("Meeting Attendance Client Service Integration Tests (#2666)", () => {
 
       const res = await meetingAttendanceApi.getMeetingAttendance("m-100");
 
-      expect(apiClient.get).toHaveBeenCalledWith(
-        "/api/meetings/m-100/attendance",
-      );
+      expect(apiClient.get).toHaveBeenCalledWith("/meetings/m-100/attendance");
       expect(res).toEqual(mockResponse);
     });
 
-    it("should call POST /api/meetings/:meetingId/attendance/checkin with email & joinTime", async () => {
+    it("should call POST /meetings/:meetingId/attendance/checkin with email & joinTime", async () => {
       const mockResponse = {
         data: { email: "user@example.com", status: "checked_in" },
       };
@@ -44,7 +42,7 @@ describe("Meeting Attendance Client Service Integration Tests (#2666)", () => {
       );
 
       expect(apiClient.post).toHaveBeenCalledWith(
-        "/api/meetings/m-100/attendance/checkin",
+        "/meetings/m-100/attendance/checkin",
         {
           email: "user@example.com",
           joinTime,
@@ -53,7 +51,7 @@ describe("Meeting Attendance Client Service Integration Tests (#2666)", () => {
       expect(res).toEqual(mockResponse);
     });
 
-    it("should call POST /api/meetings/:meetingId/attendance/checkout with email & leaveTime", async () => {
+    it("should call POST /meetings/:meetingId/attendance/checkout with email & leaveTime", async () => {
       const mockResponse = {
         data: { email: "user@example.com", status: "checked_out" },
       };
@@ -67,7 +65,7 @@ describe("Meeting Attendance Client Service Integration Tests (#2666)", () => {
       );
 
       expect(apiClient.post).toHaveBeenCalledWith(
-        "/api/meetings/m-100/attendance/checkout",
+        "/meetings/m-100/attendance/checkout",
         {
           email: "user@example.com",
           leaveTime,
@@ -76,7 +74,7 @@ describe("Meeting Attendance Client Service Integration Tests (#2666)", () => {
       expect(res).toEqual(mockResponse);
     });
 
-    it("should call PUT /api/meetings/:meetingId/attendance/excuse when marking excused", async () => {
+    it("should call PUT /meetings/:meetingId/attendance/excuse when marking excused", async () => {
       const mockResponse = {
         data: { email: "user@example.com", status: "excused" },
       };
@@ -88,13 +86,13 @@ describe("Meeting Attendance Client Service Integration Tests (#2666)", () => {
       );
 
       expect(apiClient.put).toHaveBeenCalledWith(
-        "/api/meetings/m-100/attendance/excuse",
+        "/meetings/m-100/attendance/excuse",
         { email: "user@example.com" },
       );
       expect(res).toEqual(mockResponse);
     });
 
-    it("should call POST /api/meetings/:meetingId/attendance/finalize when finalizing", async () => {
+    it("should call POST /meetings/:meetingId/attendance/finalize when finalizing", async () => {
       const mockResponse = {
         data: { message: "Attendance finalized successfully" },
       };
@@ -103,7 +101,7 @@ describe("Meeting Attendance Client Service Integration Tests (#2666)", () => {
       const res = await meetingAttendanceApi.finalizeAttendance("m-100");
 
       expect(apiClient.post).toHaveBeenCalledWith(
-        "/api/meetings/m-100/attendance/finalize",
+        "/meetings/m-100/attendance/finalize",
       );
       expect(res).toEqual(mockResponse);
     });

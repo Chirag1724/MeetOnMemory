@@ -31,9 +31,8 @@ jest.unstable_mockModule("../middleware/userAuth.js", () => ({
   },
 }));
 
-const { default: resourceBookingRoutes } = await import(
-  "../routes/resourceBookingRoutes.js"
-);
+const { default: resourceBookingRoutes } =
+  await import("../routes/resourceBookingRoutes.js");
 const PhysicalResource = (await import("../models/physicalResourceModel.js"))
   .default;
 const ResourceBooking = (await import("../models/resourceBookingModel.js"))

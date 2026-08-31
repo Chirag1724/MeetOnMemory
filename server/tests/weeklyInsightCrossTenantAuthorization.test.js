@@ -40,9 +40,8 @@ jest.unstable_mockModule("../services/EmailService.js", () => ({
   },
 }));
 
-const { default: weeklyInsightRoutes } = await import(
-  "../routes/weeklyInsightRoutes.js"
-);
+const { default: weeklyInsightRoutes } =
+  await import("../routes/weeklyInsightRoutes.js");
 const WeeklyInsight = (await import("../models/weeklyInsightModel.js")).default;
 // getLatestInsight populates stalledActionItems.{actionItem,meetingId}; both
 // schemas must be registered or the populate throws MissingSchemaError (500).

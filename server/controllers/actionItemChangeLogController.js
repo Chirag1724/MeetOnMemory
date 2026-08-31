@@ -1,4 +1,5 @@
 import ActionItemChangeLog from "../models/actionItemChangeLogModel.js";
+import { buildPaginationMeta, parsePagination } from "../utils/pagination.js";
 
 /**
  * @desc Get changelogs for a specific action item
@@ -8,30 +9,30 @@ import ActionItemChangeLog from "../models/actionItemChangeLogModel.js";
 export const getChangeLogs = async (req, res) => {
   try {
     const { id } = req.params;
-    const { type, userId, page = 1, limit = 50 } = req.query;
+    const { type, userId } = req.query;
 
     const query = { actionItemId: id };
     if (type) query.changeType = type;
     if (userId) query.changedBy = userId;
 
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = parsePagination(req.query, {
+      defaultLimit: 50,
+    });
 
     const logs = await ActionItemChangeLog.find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(Number(limit))
+      .limit(limit)
       .populate("changedBy", "name avatar email");
 
     const total = await ActionItemChangeLog.countDocuments(query);
 
+    const pagination = buildPaginationMeta({ total, page, limit });
+
     res.status(200).json({
       success: true,
       data: logs,
-      pagination: {
-        total,
-        page: Number(page),
-        pages: Math.ceil(total / limit),
-      },
+      pagination,
     });
   } catch (error) {
     console.error("Error fetching changelogs:", error);

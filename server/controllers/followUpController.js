@@ -4,6 +4,7 @@ import {
   updateTaskStatus,
 } from "../services/followUpWorkflowService.js";
 import mongoose from "mongoose";
+import { buildPaginationMeta, parsePagination } from "../utils/pagination.js";
 
 /**
  * Follow-Up Controller
@@ -17,7 +18,7 @@ import mongoose from "mongoose";
  */
 export const getTasks = async (req, res) => {
   try {
-    const { status, assignee, page = 1, limit = 20 } = req.query;
+    const { status, assignee } = req.query;
     const userId = req.user._id;
     const organizationId = req.user.organization;
 
@@ -25,6 +26,11 @@ export const getTasks = async (req, res) => {
 
     // Filter by assignee (default to current user)
     if (assignee) {
+      // Validate assignee is a well-formed ObjectId so a malformed value is
+      // rejected as a 400 client error instead of surfacing as a 500 CastError.
+      if (!mongoose.isValidObjectId(assignee)) {
+        return res.status(400).json({ message: "Invalid assignee ID" });
+      }
       query.assignee = assignee;
     } else {
       query.assignee = userId;
@@ -43,7 +49,9 @@ export const getTasks = async (req, res) => {
       query.$or = [{ snoozedUntil: null }, { snoozedUntil: { $lte: now } }];
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const { page, limit, skip } = parsePagination(req.query, {
+      defaultLimit: 20,
+    });
 
     const tasks = await FollowUpTask.find(query)
       .populate("assignee", "name email profilePicture")
@@ -51,18 +59,15 @@ export const getTasks = async (req, res) => {
       .populate("completedBy", "name email")
       .sort({ deadline: 1 })
       .skip(skip)
-      .limit(parseInt(limit));
+      .limit(limit);
 
     const total = await FollowUpTask.countDocuments(query);
 
+    const pagination = buildPaginationMeta({ total, page, limit });
+
     res.status(200).json({
       tasks,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        totalPages: Math.ceil(total / parseInt(limit)),
-      },
+      pagination,
     });
   } catch (error) {
     console.error("Error fetching tasks:", error);

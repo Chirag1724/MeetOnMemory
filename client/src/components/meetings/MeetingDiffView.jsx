@@ -51,8 +51,8 @@ const DiffSection = ({ title, diffData, renderItem }) => {
               <Minus className="w-4 h-4 mr-1" /> Removed / Dropped
             </h4>
             <div className="space-y-2 opacity-75">
-              {(diffData.removed || diffData.dropped).map((item, idx) =>
-                renderItem(item, idx, "removed"),
+              {[...(diffData.removed || []), ...(diffData.dropped || [])].map(
+                (item, idx) => renderItem(item, idx, "removed"),
               )}
             </div>
           </div>

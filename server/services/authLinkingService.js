@@ -86,13 +86,14 @@ export const provisionOrLinkClerkUser = async ({
   if (user) {
     let needsSave = false;
     const pending = {};
+    const updateSet = {};
     if (profilePic && !user.profilePic) {
-      user.profilePic = profilePic;
+      updateSet.profilePic = profilePic;
       needsSave = true;
       pending.profilePic = true;
     }
     if (name && (!user.name || user.name === "User")) {
-      user.name = name;
+      updateSet.name = name;
       needsSave = true;
       pending.name = true;
     }
@@ -138,25 +139,31 @@ export const provisionOrLinkClerkUser = async ({
           profilePic,
         });
       }
-      user.email = email;
+      updateSet.email = email;
       needsSave = true;
       pending.email = true;
     }
     if (needsSave) {
       console.error(
-        `${DIAG} 10. DB write: user.save() (existing by clerkUserId)`,
+        `${DIAG} 10. DB write: userModel.findOneAndUpdate() (existing by clerkUserId)`,
         {
           pending,
           mongoUserId: user._id?.toString?.(),
-          email: user.email,
+          email: updateSet.email || user.email,
         },
       );
       try {
-        await user.save();
-        console.error(`${DIAG} 10. user.save() OK`);
+        user = await userModel
+          .findOneAndUpdate(
+            { _id: user._id },
+            { $set: updateSet },
+            { new: true },
+          )
+          .select("-password");
+        console.error(`${DIAG} 10. userModel.findOneAndUpdate() OK`);
       } catch (err) {
         console.error(
-          `${DIAG} 10. user.save() FAILED (existing by clerkUserId)`,
+          `${DIAG} 10. userModel.findOneAndUpdate() FAILED (existing by clerkUserId)`,
         );
         console.error(err);
         console.error(err?.stack);
@@ -181,15 +188,15 @@ export const provisionOrLinkClerkUser = async ({
       existingClerkUserId: user?.clerkUserId || null,
     });
     if (user) {
-      user.clerkUserId = clerkUserId;
+      const updateSet = { clerkUserId };
       if (profilePic && !user.profilePic) {
-        user.profilePic = profilePic;
+        updateSet.profilePic = profilePic;
       }
       if (name && (!user.name || user.name === "User")) {
-        user.name = name;
+        updateSet.name = name;
       }
       console.error(
-        `${DIAG} 10. DB write: user.save() (link legacy by email)`,
+        `${DIAG} 10. DB write: userModel.findOneAndUpdate() (link legacy by email)`,
         {
           mongoUserId: user._id?.toString?.(),
           clerkUserId,
@@ -197,10 +204,20 @@ export const provisionOrLinkClerkUser = async ({
         },
       );
       try {
-        await user.save();
-        console.error(`${DIAG} 10. user.save() OK (legacy link)`);
+        user = await userModel
+          .findOneAndUpdate(
+            { _id: user._id },
+            { $set: updateSet },
+            { new: true },
+          )
+          .select("-password");
+        console.error(
+          `${DIAG} 10. userModel.findOneAndUpdate() OK (legacy link)`,
+        );
       } catch (err) {
-        console.error(`${DIAG} 10. user.save() FAILED (legacy link)`);
+        console.error(
+          `${DIAG} 10. userModel.findOneAndUpdate() FAILED (legacy link)`,
+        );
         console.error(err);
         console.error(err?.stack);
         throw err;

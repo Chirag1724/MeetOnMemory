@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { publicSharedApi } from "../services";
 import {
@@ -17,6 +17,10 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import VenueMapPreview from "../components/meetings/VenueMapPreview";
 
+const SharedTranscript = React.lazy(
+  () => import("../components/transcripts/SharedTranscript"),
+);
+
 const PublicSharedView = () => {
   const { hash } = useParams();
   const [loading, setLoading] = useState(true);
@@ -30,21 +34,42 @@ const PublicSharedView = () => {
   const [resource, setResource] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
 
+  const fetchAbortController = useRef(null);
+
   useEffect(() => {
     fetchResource();
+    return () => {
+      if (fetchAbortController.current) {
+        fetchAbortController.current.abort();
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hash]);
 
   const fetchResource = async () => {
+    if (fetchAbortController.current) {
+      fetchAbortController.current.abort();
+    }
+    fetchAbortController.current = new AbortController();
+
     try {
       setLoading(true);
       setError(null);
-      const { data } = await publicSharedApi.getPublicResource(hash);
+      const { data } = await publicSharedApi.getPublicResource(hash, {
+        signal: fetchAbortController.current.signal,
+      });
       if (data.success) {
         setResource(data);
         setActiveTab("overview");
       }
     } catch (err) {
+      if (
+        err.name === "CanceledError" ||
+        err.message === "canceled" ||
+        err.code === "ERR_CANCELED"
+      ) {
+        return;
+      }
       if (
         err.response?.status === 401 &&
         err.response?.data?.requiresPasscode
@@ -56,7 +81,9 @@ const PublicSharedView = () => {
         );
       }
     } finally {
-      setLoading(false);
+      if (!fetchAbortController.current?.signal.aborted) {
+        setLoading(false);
+      }
     }
   };
 
@@ -356,24 +383,20 @@ const PublicSharedView = () => {
               )}
 
               {activeTab === "transcript" && data.transcriptExcerpt && (
-                <div
-                  className="mt-4 space-y-3"
-                  data-testid="shared-transcript-section"
-                >
-                  {data.transcriptExcerpt.map((segment, idx) => (
-                    <div
-                      key={idx}
-                      className="border border-gray-100 dark:border-gray-700 rounded-lg p-3"
-                    >
-                      <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 mb-1">
-                        {segment.speaker}
-                      </p>
-                      <p className="text-sm text-gray-700 dark:text-gray-300">
-                        {segment.text}
-                      </p>
+                <Suspense
+                  fallback={
+                    <div className="mt-4 space-y-3 animate-pulse">
+                      {[1, 2, 3].map((i) => (
+                        <div
+                          key={i}
+                          className="h-24 bg-gray-100 dark:bg-gray-800 rounded-lg w-full"
+                        ></div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  }
+                >
+                  <SharedTranscript segments={data.transcriptExcerpt} />
+                </Suspense>
               )}
 
               {activeTab === "attachments" && data.attachments && (

@@ -21,6 +21,7 @@ import {
   searchStateToParams,
 } from "../utils/searchHistory.js";
 import { toast } from "react-toastify";
+import { useDebounce } from "../hooks/useDebounce.js";
 
 const FOCUSABLE_SELECTOR =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -252,6 +253,9 @@ const AiSearch = () => {
   const initial = paramsToSearchState(searchParams);
 
   const [query, setQuery] = useState(initial.query);
+  const debouncedQuery = useDebounce(query, 400);
+  const abortControllerRef = useRef(null);
+
   const [results, setResults] = useState([]);
   const [aiAnswer, setAiAnswer] = useState("");
   const [loading, setLoading] = useState(false);
@@ -288,6 +292,12 @@ const AiSearch = () => {
         return;
       }
 
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+      const signal = abortControllerRef.current.signal;
+
       setLoading(true);
       setError("");
       setResults([]);
@@ -301,39 +311,48 @@ const AiSearch = () => {
 
       try {
         if (nextMode === "federated") {
-          const res = await searchApi.federatedSearch({
-            query: nextQuery,
-            dateFrom: nextFilters.dateFrom || undefined,
-            dateTo: nextFilters.dateTo || undefined,
-            meetingType: nextFilters.meetingType || undefined,
-            speaker: nextFilters.speaker || undefined,
-            tag: nextFilters.tag || undefined,
-            organizer: nextFilters.organizer || undefined,
-            department: nextFilters.department || undefined,
-          });
+          const res = await searchApi.federatedSearch(
+            {
+              query: nextQuery,
+              dateFrom: nextFilters.dateFrom || undefined,
+              dateTo: nextFilters.dateTo || undefined,
+              meetingType: nextFilters.meetingType || undefined,
+              speaker: nextFilters.speaker || undefined,
+              tag: nextFilters.tag || undefined,
+              organizer: nextFilters.organizer || undefined,
+              department: nextFilters.department || undefined,
+            },
+            { signal },
+          );
           const data = res?.data || res || {};
           setResults(data.results || []);
           setAiAnswer(data.aiAnswer || "");
         } else if (nextMode === "hybrid") {
-          const res = await searchApi.hybridSearch({
-            query: nextQuery,
-            ...nextWeights,
-            dateFrom: nextFilters.dateFrom || undefined,
-            dateTo: nextFilters.dateTo || undefined,
-            meetingType: nextFilters.meetingType || undefined,
-            speaker: nextFilters.speaker || undefined,
-            tag: nextFilters.tag || undefined,
-            organizer: nextFilters.organizer || undefined,
-            department: nextFilters.department || undefined,
-          });
+          const res = await searchApi.hybridSearch(
+            {
+              query: nextQuery,
+              ...nextWeights,
+              dateFrom: nextFilters.dateFrom || undefined,
+              dateTo: nextFilters.dateTo || undefined,
+              meetingType: nextFilters.meetingType || undefined,
+              speaker: nextFilters.speaker || undefined,
+              tag: nextFilters.tag || undefined,
+              organizer: nextFilters.organizer || undefined,
+              department: nextFilters.department || undefined,
+            },
+            { signal },
+          );
           const data = res?.data || res || {};
           setResults(data.results || []);
           setAiAnswer(data.aiAnswer || "");
         } else {
-          const res = await searchApi.semanticSearch({
-            query: nextQuery,
-            filters: nextFilters,
-          });
+          const res = await searchApi.semanticSearch(
+            {
+              query: nextQuery,
+              filters: nextFilters,
+            },
+            { signal },
+          );
           let sortedResults = res.results || res.data?.results || [];
 
           if (nextFilters.sortBy === "date-desc") {
@@ -361,6 +380,9 @@ const AiSearch = () => {
           );
         }
       } catch (err) {
+        if (err.name === "AbortError" || err.message === "canceled") {
+          return; // Ignore abort errors
+        }
         console.error("❌ Search error:", err);
         const message =
           err?.response?.data?.message ||
@@ -381,6 +403,17 @@ const AiSearch = () => {
   );
 
   useEffect(() => {
+    if (bootstrapped.current) {
+      if (debouncedQuery.trim().length >= 3) {
+        runSearch({ nextQuery: debouncedQuery, persistHistory: false });
+      } else if (debouncedQuery.trim().length === 0 && hasSearched) {
+        handleClear();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedQuery]);
+
+  useEffect(() => {
     if (bootstrapped.current) return;
     bootstrapped.current = true;
     if (initial.query.trim().length >= 3) {
@@ -389,7 +422,7 @@ const AiSearch = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- bootstrap once from URL
   }, []);
 
-  const handleSearch = () => runSearch();
+  const handleSearch = () => runSearch({ persistHistory: true });
 
   const handleClear = () => {
     setQuery("");

@@ -10,6 +10,7 @@ vi.mock("../models/userModel.js", () => ({
   default: {
     findOne: vi.fn(),
     findByIdAndUpdate: vi.fn(),
+    findOneAndUpdate: vi.fn(),
     create: vi.fn(),
   },
 }));
@@ -97,13 +98,25 @@ describe("Clerk User Provisioning & MongoDB RBAC Integration (#801)", () => {
         select: vi.fn().mockResolvedValue(existingLegacyUser),
       });
 
+    const mockUpdatedUser = {
+      ...existingLegacyUser,
+      clerkUserId: "user_clerk_legacy",
+    };
+    userModel.findOneAndUpdate.mockReturnValue({
+      select: vi.fn().mockResolvedValue(mockUpdatedUser),
+    });
+
     const user = await provisionOrLinkClerkUser({
       clerkUserId: "user_clerk_legacy",
       email: "legacy@example.com",
     });
 
     expect(user._id).toBe("mongoLegacy");
-    expect(existingLegacyUser.clerkUserId).toBe("user_clerk_legacy");
-    expect(existingLegacyUser.save).toHaveBeenCalled();
+    expect(user.clerkUserId).toBe("user_clerk_legacy");
+    expect(userModel.findOneAndUpdate).toHaveBeenCalledWith(
+      { _id: "mongoLegacy" },
+      { $set: { clerkUserId: "user_clerk_legacy" } },
+      { new: true },
+    );
   });
 });

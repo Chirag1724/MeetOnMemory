@@ -1,5 +1,15 @@
 import AiMeetingNote from "../models/aiMeetingNoteModel.js";
+import Meeting from "../models/meetingModel.js";
 import { escapeRegExp } from "../utils/regexUtils.js";
+import { buildPaginationMeta, parsePagination } from "../utils/pagination.js";
+import {
+  createCircuitBreaker,
+  callWithResilience,
+} from "../utils/aiResilience.js";
+
+const aiNoteBreaker = createCircuitBreaker({
+  name: "ai-meeting-note-generator",
+});
 
 /**
  * Built-in reusable note templates
@@ -297,9 +307,11 @@ export const getNotes = async (req, res) => {
       endDate,
       sortBy = "date",
       sortOrder = "desc",
-      page = 1,
-      limit = 20,
     } = req.query;
+
+    const { page, limit, skip } = parsePagination(req.query, {
+      defaultLimit: 20,
+    });
 
     const query = { organization: organizationId };
 
@@ -326,14 +338,13 @@ export const getNotes = async (req, res) => {
       if (endDate) query.date.$lte = new Date(endDate);
     }
 
-    const skip = (Math.max(1, Number(page)) - 1) * Math.max(1, Number(limit));
     const sort = { [sortBy]: sortOrder === "asc" ? 1 : -1 };
 
     const [notes, total] = await Promise.all([
       AiMeetingNote.find(query)
         .sort(sort)
         .skip(skip)
-        .limit(Number(limit))
+        .limit(limit)
         .populate("meeting", "title date meetingType")
         .populate("createdBy", "name email")
         .populate("reviewedBy", "name email")
@@ -341,16 +352,13 @@ export const getNotes = async (req, res) => {
       AiMeetingNote.countDocuments(query),
     ]);
 
+    const pagination = buildPaginationMeta({ total, page, limit });
+
     return res.status(200).json({
       success: true,
       data: {
         notes,
-        pagination: {
-          total,
-          page: Number(page),
-          limit: Number(limit),
-          pages: Math.ceil(total / Number(limit)) || 1,
-        },
+        pagination,
       },
     });
   } catch (error) {
@@ -450,11 +458,35 @@ export const generateAiNote = async (req, res) => {
       ...new Set([...(tags || []), ...(template.defaultTags || [])]),
     ];
 
-    const synthesis = synthesizeAiNoteContent(
-      rawContent,
-      templateUsed,
-      title.trim(),
-    );
+    let synthesis;
+    try {
+      synthesis = await callWithResilience(
+        async () => {
+          return synthesizeAiNoteContent(
+            rawContent,
+            templateUsed,
+            title.trim(),
+          );
+        },
+        {
+          breaker: aiNoteBreaker,
+          timeoutMs: 30000,
+          label: "AI Note Synthesis",
+        },
+      );
+    } catch (err) {
+      console.error("AI Note generation failed:", err);
+      if (meeting) {
+        await Meeting.findByIdAndUpdate(meeting, {
+          status: "failed_permanently",
+        });
+      }
+      return res.status(503).json({
+        success: false,
+        message: "AI Note generation failed due to timeout or rate limit",
+        error: err.message,
+      });
+    }
 
     const note = new AiMeetingNote({
       organization: organizationId,

@@ -1,4 +1,5 @@
 import MeetingROI from "../models/meetingROIModel.js";
+import { buildPaginationMeta, parsePagination } from "../utils/pagination.js";
 
 /**
  * Helper to calculate cost and ROI fields for payload/instance
@@ -80,9 +81,11 @@ export const getROIRecords = async (req, res) => {
       endDate,
       sortBy = "date",
       sortOrder = "desc",
-      page = 1,
-      limit = 20,
     } = req.query;
+
+    const { page, limit, skip } = parsePagination(req.query, {
+      defaultLimit: 20,
+    });
 
     const query = { organization: organizationId };
 
@@ -108,29 +111,25 @@ export const getROIRecords = async (req, res) => {
       if (endDate) query.date.$lte = new Date(endDate);
     }
 
-    const skip = (Math.max(1, Number(page)) - 1) * Math.max(1, Number(limit));
     const sort = { [sortBy]: sortOrder === "asc" ? 1 : -1 };
 
     const [records, total] = await Promise.all([
       MeetingROI.find(query)
         .sort(sort)
         .skip(skip)
-        .limit(Number(limit))
+        .limit(limit)
         .populate("meeting", "title date meetingType")
         .lean(),
       MeetingROI.countDocuments(query),
     ]);
 
+    const pagination = buildPaginationMeta({ total, page, limit });
+
     return res.status(200).json({
       success: true,
       data: {
         records,
-        pagination: {
-          total,
-          page: Number(page),
-          limit: Number(limit),
-          pages: Math.ceil(total / Number(limit)) || 1,
-        },
+        pagination,
       },
     });
   } catch (error) {

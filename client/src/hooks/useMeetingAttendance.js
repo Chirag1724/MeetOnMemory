@@ -10,7 +10,7 @@ const useMeetingAttendance = (meetingId) => {
     if (!meetingId) return;
     try {
       setLoading(true);
-      const res = await api.get(`/meetings/${meetingId}/attendance`);
+      const res = await api.get(`/api/meetings/${meetingId}/attendance`);
       setAttendance(res.data);
       setError(null);
     } catch (err) {
@@ -27,7 +27,7 @@ const useMeetingAttendance = (meetingId) => {
 
   const checkIn = async (email, joinTime = new Date()) => {
     try {
-      await api.post(`/meetings/${meetingId}/attendance/checkin`, {
+      await api.post(`/api/meetings/${meetingId}/attendance/checkin`, {
         email,
         joinTime,
       });
@@ -40,7 +40,7 @@ const useMeetingAttendance = (meetingId) => {
 
   const checkOut = async (email, leaveTime = new Date()) => {
     try {
-      await api.post(`/meetings/${meetingId}/attendance/checkout`, {
+      await api.post(`/api/meetings/${meetingId}/attendance/checkout`, {
         email,
         leaveTime,
       });
@@ -53,7 +53,7 @@ const useMeetingAttendance = (meetingId) => {
 
   const markExcused = async (email) => {
     try {
-      await api.put(`/meetings/${meetingId}/attendance/excuse`, { email });
+      await api.put(`/api/meetings/${meetingId}/attendance/excuse`, { email });
       await fetchAttendance();
     } catch (err) {
       console.error("Error marking excused:", err);
@@ -63,7 +63,7 @@ const useMeetingAttendance = (meetingId) => {
 
   const finalizeAttendance = async () => {
     try {
-      await api.post(`/meetings/${meetingId}/attendance/finalize`);
+      await api.post(`/api/meetings/${meetingId}/attendance/finalize`);
       await fetchAttendance();
     } catch (err) {
       console.error("Error finalizing attendance:", err);

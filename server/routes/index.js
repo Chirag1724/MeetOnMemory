@@ -280,7 +280,14 @@ router.use("/api/gamification", gamificationRoutes);
 router.use("/api/action-items", actionItemsRoutes);
 
 import preMeetingBriefingRoutes from "./preMeetingBriefingRoutes.js";
-router.use("/api/briefings", preMeetingBriefingRoutes);
+router.use(
+  [
+    "/api/briefings",
+    "/api/meeting/:meetingId/briefing",
+    "/api/meetings/:meetingId/briefing",
+  ],
+  preMeetingBriefingRoutes,
+);
 
 import escalationRoutes from "./escalationRoutes.js";
 router.use(["/api/escalations", "/api/escalation-policies"], escalationRoutes);
@@ -342,5 +349,11 @@ router.use("/api/meeting-retrospectives", meetingRetrospectiveRoutes);
 
 import meetingQuestionRoutes from "./meetingQuestionRoutes.js";
 router.use("/api", meetingQuestionRoutes);
+
+// Issue #2570 — the Custom Roles / Resource-ACL router existed but was never
+// imported here, so every endpoint in the feature returned 404 in the running
+// app. Mounted once under /api/custom-roles.
+import customRoleRoutes from "./customRoleRoutes.js";
+router.use("/api/custom-roles", customRoleRoutes);
 
 export default router;

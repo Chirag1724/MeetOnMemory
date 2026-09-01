@@ -64,4 +64,34 @@ export const isSameOrganization = (a, b) => {
   return left === right;
 };
 
-export default { toOrganizationId, isSameOrganization };
+/**
+ * Server-trusted organization id for the current request (Issue #2571).
+ *
+ * `requireOrganizationParamMatch` sets `req.authorizedOrganizationId` only
+ * after proving the client-supplied path/query value equals the caller's
+ * membership organization. Routes without a path param fall back to the
+ * membership organization itself.
+ *
+ * Controllers MUST call this instead of reading `req.params.orgId` /
+ * `req.params.organizationId` / `req.body.organizationId` — those are attacker
+ * controlled and are what made the weekly-insight and resource-booking routes
+ * cross-tenant readable and writable.
+ *
+ * @param {{authorizedOrganizationId?: unknown, user?: {organization?: unknown}}} req
+ * @returns {string|null} null when the caller has no organization membership.
+ */
+export const resolveAuthorizedOrganizationId = (req) => {
+  const authorized = req?.authorizedOrganizationId;
+  if (authorized !== null && authorized !== undefined) {
+    const id = String(authorized);
+    if (id.length > 0) return id;
+  }
+
+  return toOrganizationId(req?.user?.organization);
+};
+
+export default {
+  toOrganizationId,
+  isSameOrganization,
+  resolveAuthorizedOrganizationId,
+};

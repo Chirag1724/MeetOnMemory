@@ -257,6 +257,7 @@ export const createMeeting = async (uploaderId, orgId, data) => {
   (async () => {
     try {
       const calendarService = await loadCalendarService();
+      const updates = {};
 
       // Sync with Google Calendar
       const googleEventId = await calendarService.createGoogleEvent(
@@ -264,14 +265,11 @@ export const createMeeting = async (uploaderId, orgId, data) => {
         meeting,
       );
       if (googleEventId) {
-        meeting.calendarEvents = meeting.calendarEvents || {};
-        meeting.calendarEvents.google = {
+        updates["calendarEvents.google"] = {
           eventId: googleEventId,
           syncedAt: new Date(),
         };
-        // Update legacy field for backward compatibility
-        meeting.googleEventId = googleEventId;
-        await meeting.save();
+        updates["googleEventId"] = googleEventId;
       }
 
       // Sync with Microsoft Calendar
@@ -280,12 +278,14 @@ export const createMeeting = async (uploaderId, orgId, data) => {
         meeting,
       );
       if (microsoftEventId) {
-        meeting.calendarEvents = meeting.calendarEvents || {};
-        meeting.calendarEvents.microsoft = {
+        updates["calendarEvents.microsoft"] = {
           eventId: microsoftEventId,
           syncedAt: new Date(),
         };
-        await meeting.save();
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await Meeting.findByIdAndUpdate(meeting._id, { $set: updates });
       }
     } catch (err) {
       console.error("⚠️ Calendar sync error (continuing):", err.message);

@@ -72,6 +72,12 @@ const STATUS_BADGE = {
     className:
       "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400",
   },
+  failed_permanently: {
+    label: "Failed Permanently",
+    Icon: XCircle,
+    className:
+      "bg-rose-50 dark:bg-rose-950/20 border-rose-200/50 dark:border-rose-900/30 text-rose-600 dark:text-rose-400",
+  },
   checking: {
     label: "Checking...",
     Icon: null,
@@ -127,6 +133,15 @@ const getOverallPresentation = (loadState, platformStatus, fetchError) => {
         label: "System Outage",
         description:
           "A required monitored service is unavailable. Platform functionality is impacted.",
+        color:
+          "text-rose-600 bg-rose-50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/50",
+        indicator: "bg-rose-500",
+      };
+    case "failed_permanently":
+      return {
+        label: "Failed Permanently",
+        description:
+          "The background job failed permanently due to upstream API rate limits or timeout. Polling has been stopped.",
         color:
           "text-rose-600 bg-rose-50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/50",
         indicator: "bg-rose-500",
@@ -229,6 +244,14 @@ const Status = () => {
           ? null
           : data.message || "Platform status check failed",
       );
+      return;
+    }
+
+    if (data.status === "failed_permanently") {
+      setLoadState("failed_permanently");
+      setFetchError("Job failed permanently. Stopped polling.");
+      clearInterval(pollIntervalRef.current);
+      clearInterval(countdownIntervalRef.current);
       return;
     }
 
@@ -402,6 +425,32 @@ const Status = () => {
               onRetry={refreshStatus}
               retryText="Retry Health Check"
             />
+          </div>
+        )}
+
+        {loadState === "failed_permanently" && (
+          <div className="mb-8 rounded-xl border border-rose-200 dark:border-rose-900/40 bg-rose-50 dark:bg-rose-950/20 p-4 text-sm text-rose-800 dark:text-rose-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <span>
+              {fetchError ||
+                "A permanent failure was detected. Polling has been halted."}
+            </span>
+            <button
+              onClick={() => {
+                pollIntervalRef.current = setInterval(() => {
+                  refreshStatus();
+                }, STATUS_POLL_INTERVAL_SEC * 1000);
+                countdownIntervalRef.current = setInterval(() => {
+                  setRefreshCountdown((prev) =>
+                    prev <= 1 ? STATUS_POLL_INTERVAL_SEC : prev - 1,
+                  );
+                }, 1000);
+                refreshStatus();
+              }}
+              className="inline-flex items-center gap-2 px-3 py-1.5 bg-rose-600 text-white rounded-lg text-xs font-semibold hover:bg-rose-700 transition"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Retry Now
+            </button>
           </div>
         )}
 

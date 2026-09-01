@@ -38,10 +38,8 @@ jest.unstable_mockModule("../middleware/userAuth.js", () => ({
   sanitizeAuthRequestForLog: jest.fn(),
 }));
 
-jest.unstable_mockModule("../middleware/rbac.js", () => ({
-  requireRole: () => (req, res, next) => next(),
-}));
-
+// Issue #2571: the real rbac middleware is used (no mock) so the org/param
+// guard on every :orgId route is exercised by these prefix tests.
 const { default: weeklyInsightRoutes } =
   await import("../routes/weeklyInsightRoutes.js");
 
@@ -58,7 +56,8 @@ describe("Weekly Insights Server API Route Prefix Guards Suite (#2620)", () => {
 
   describe("API Route Prefix Enforcement against Production Routes", () => {
     it("should return 200 for GET /api/weekly-insights/:orgId/latest", async () => {
-      const orgId = new mongoose.Types.ObjectId().toString();
+      // Issue #2571: the caller's own organization, not an arbitrary one.
+      const orgId = mockUser.organization;
       const mockInsight = {
         _id: new mongoose.Types.ObjectId().toString(),
         organization: orgId,
@@ -91,7 +90,8 @@ describe("Weekly Insights Server API Route Prefix Guards Suite (#2620)", () => {
     });
 
     it("should return 200 for GET /api/weekly-insights/:orgId with pagination params", async () => {
-      const orgId = new mongoose.Types.ObjectId().toString();
+      // Issue #2571: the caller's own organization, not an arbitrary one.
+      const orgId = mockUser.organization;
       mockFind.mockReturnValueOnce({
         sort: jest.fn().mockReturnValue({
           skip: jest.fn().mockReturnValue({
@@ -120,7 +120,8 @@ describe("Weekly Insights Server API Route Prefix Guards Suite (#2620)", () => {
     });
 
     it("should return 201 for POST /api/weekly-insights/:orgId/generate", async () => {
-      const orgId = new mongoose.Types.ObjectId().toString();
+      // Issue #2571: the caller's own organization, not an arbitrary one.
+      const orgId = mockUser.organization;
       const mockCreated = {
         _id: new mongoose.Types.ObjectId().toString(),
         organization: orgId,

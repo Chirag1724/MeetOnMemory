@@ -30,6 +30,9 @@ vi.mock("../../components/tasks/TaskDetailsModal", () => ({
 vi.mock("../../components/meetings/Pagination", () => ({
   default: () => null,
 }));
+vi.mock("../../components/dashboard/RecurringActionItems.jsx", () => ({
+  default: () => null,
+}));
 
 vi.mock("../../hooks/useTasks", () => ({
   default: () => ({

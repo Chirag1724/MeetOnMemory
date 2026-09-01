@@ -45,8 +45,16 @@ const ResourceAclSchema = new mongoose.Schema(
   },
 );
 
+// Issue #2570 — granteeType is part of a grant's identity: a USER grant and a
+// ROLE grant for the same granteeId must be able to coexist.
 ResourceAclSchema.index(
-  { organizationId: 1, resourceType: 1, resourceId: 1, granteeId: 1 },
+  {
+    organizationId: 1,
+    resourceType: 1,
+    resourceId: 1,
+    granteeType: 1,
+    granteeId: 1,
+  },
   { unique: true },
 );
 

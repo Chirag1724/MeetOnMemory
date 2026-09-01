@@ -458,7 +458,8 @@ export const initWebhookWorker = () => {
 // 📡 Register internal event bus listeners to fire webhooks
 // ─────────────────────────────────────────────────────────────
 
-eventBus.on("meeting.created", (meeting) => {
+eventBus.on("meeting.created", (payload) => {
+  const meeting = payload?.meeting || payload;
   const orgId = meeting?.organization;
   if (!orgId) return;
 

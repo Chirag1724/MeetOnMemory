@@ -1,9 +1,6 @@
 import SharedLink from "../models/sharedLinkModel.js";
 import Meeting from "../models/meetingModel.js";
 import Policy from "../models/policyModel.js";
-import Transcript from "../models/transcriptModel.js";
-import Attachment from "../models/attachmentModel.js";
-import MeetingClip from "../models/meetingClipModel.js";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -509,12 +506,106 @@ export const getPublicResource = async (req, res) => {
         link.shareSettings || DEFAULT_SHARE_SETTINGS,
       );
 
-      const meeting = await Meeting.findById(link.resourceId)
-        .select(
-          "title description date time location venue venueCoordinates " +
-            "participants summary structuredMoM transcript organization",
-        )
-        .lean();
+      const meetingAggregation = await Meeting.aggregate([
+        { $match: { _id: link.resourceId } },
+        {
+          $project: {
+            title: 1,
+            description: 1,
+            date: 1,
+            time: 1,
+            location: 1,
+            venue: 1,
+            venueCoordinates: 1,
+            participants: 1,
+            summary: 1,
+            structuredMoM: 1,
+            transcript: 1,
+            organization: 1,
+          },
+        },
+        ...(settings.includeTranscript
+          ? [
+              {
+                $lookup: {
+                  from: "transcripts",
+                  let: { meetingId: "$_id" },
+                  pipeline: [
+                    {
+                      $match: {
+                        $expr: { $eq: ["$meeting", "$$meetingId"] },
+                      },
+                    },
+                    {
+                      $project: {
+                        segments: 1,
+                        fullText: 1,
+                      },
+                    },
+                  ],
+                  as: "transcriptDocs",
+                },
+              },
+            ]
+          : []),
+        ...(settings.includeAttachments
+          ? [
+              {
+                $lookup: {
+                  from: "attachments",
+                  let: { meetingId: "$_id" },
+                  pipeline: [
+                    {
+                      $match: {
+                        $expr: { $eq: ["$meeting", "$$meetingId"] },
+                      },
+                    },
+                    {
+                      $project: {
+                        fileName: 1,
+                        fileType: 1,
+                        fileSize: 1,
+                        mimeType: 1,
+                        createdAt: 1,
+                      },
+                    },
+                  ],
+                  as: "attachments",
+                },
+              },
+            ]
+          : []),
+        ...(settings.includeClips
+          ? [
+              {
+                $lookup: {
+                  from: "meetingclips",
+                  let: { meetingId: "$_id" },
+                  pipeline: [
+                    {
+                      $match: {
+                        $expr: { $eq: ["$meeting", "$$meetingId"] },
+                      },
+                    },
+                    {
+                      $project: {
+                        title: 1,
+                        description: 1,
+                        startTime: 1,
+                        endTime: 1,
+                        transcriptSegments: 1,
+                        labels: 1,
+                      },
+                    },
+                  ],
+                  as: "clips",
+                },
+              },
+            ]
+          : []),
+      ]);
+
+      const meeting = meetingAggregation[0];
 
       if (!meeting) {
         return res
@@ -522,25 +613,15 @@ export const getPublicResource = async (req, res) => {
           .json({ success: false, message: "Meeting not found" });
       }
 
-      const [transcriptDoc, attachments, clips] = await Promise.all([
-        settings.includeTranscript
-          ? Transcript.findOne({ meeting: link.resourceId })
-              .select("segments fullText")
-              .lean()
-          : null,
-        settings.includeAttachments
-          ? Attachment.find({ meeting: link.resourceId })
-              .select("fileName fileType fileSize mimeType createdAt")
-              .lean()
-          : [],
-        settings.includeClips
-          ? MeetingClip.find({ meeting: link.resourceId })
-              .select(
-                "title description startTime endTime transcriptSegments labels",
-              )
-              .lean()
-          : [],
-      ]);
+      const transcriptDoc =
+        settings.includeTranscript && meeting.transcriptDocs
+          ? meeting.transcriptDocs[0]
+          : null;
+      const attachments =
+        settings.includeAttachments && meeting.attachments
+          ? meeting.attachments
+          : [];
+      const clips = settings.includeClips && meeting.clips ? meeting.clips : [];
 
       resourceData = await buildPublicMeetingResource({
         meeting,

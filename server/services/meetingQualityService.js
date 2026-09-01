@@ -519,27 +519,32 @@ const generateRecommendations = (scores, _insights) => {
 const awardBadges = async (scores, meeting, _meetingId) => {
   const badges = [];
 
-  // Check each badge definition
-  for (const [badgeName, definition] of Object.entries(BADGE_DEFINITIONS)) {
-    try {
-      const benchmark = await calculateBenchmarkComparison(
-        scores.overall,
-        meeting.organization,
-        meeting.meetingType,
-      );
+  try {
+    // Execute benchmark query exactly once per meeting
+    const benchmark = await calculateBenchmarkComparison(
+      scores.overall,
+      meeting.organization,
+      meeting.meetingType,
+    );
 
-      if (definition.criteria(scores, benchmark)) {
-        badges.push({
-          name: badgeName,
-          icon: definition.icon,
-          description: definition.description,
-          rarity: definition.rarity,
-          earnedAt: new Date(),
-        });
+    // Check each badge definition
+    for (const [badgeName, definition] of Object.entries(BADGE_DEFINITIONS)) {
+      try {
+        if (definition.criteria(scores, benchmark)) {
+          badges.push({
+            name: badgeName,
+            icon: definition.icon,
+            description: definition.description,
+            rarity: definition.rarity,
+            earnedAt: new Date(),
+          });
+        }
+      } catch (_err) {
+        console.warn(`Error checking badge ${badgeName}:`, _err.message);
       }
-    } catch (_err) {
-      console.warn(`Error checking badge ${badgeName}:`, _err.message);
     }
+  } catch (error) {
+    console.warn("Failed to calculate benchmark for badges:", error.message);
   }
 
   return badges;
@@ -818,9 +823,12 @@ const calculateStandardDeviations = (scores) => {
 
   dimensions.forEach((dim) => {
     const values = scores.map((s) => s.scores?.[dim] || 0);
-    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const mean =
+      values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
     const variance =
-      values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / values.length;
+      values.length > 0
+        ? values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / values.length
+        : 0;
     stdDev[dim] = Math.round(Math.sqrt(variance) * 10) / 10;
   });
 

@@ -821,6 +821,7 @@ const OrganizationSettings = () => {
 
   // Loading & state management
   const [loading, setLoading] = useState(true);
+  const [isLinking, setIsLinking] = useState(false);
   const [saving, setSaving] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
   const [userRole, setUserRole] = useState("member");
@@ -2259,17 +2260,30 @@ const OrganizationSettings = () => {
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div
+              className={`space-y-4 ${isLinking ? "opacity-60 pointer-events-none" : ""}`}
+            >
               <div id="notion">
-                <NotionConnectPanel canEdit={canEdit} />
+                <NotionConnectPanel
+                  canEdit={canEdit}
+                  isLinking={isLinking}
+                  setIsLinking={setIsLinking}
+                />
               </div>
               <div id="github">
-                <GitHubConnectPanel organizationId={metadata._id} />
+                <GitHubConnectPanel
+                  organizationId={metadata._id}
+                  canEdit={canEdit}
+                  isLinking={isLinking}
+                  setIsLinking={setIsLinking}
+                />
               </div>
               <div id="slack">
                 <SlackConnectPanel
                   organizationId={metadata._id}
                   canEdit={canEdit}
+                  isLinking={isLinking}
+                  setIsLinking={setIsLinking}
                 />
               </div>
               <div id="jira">

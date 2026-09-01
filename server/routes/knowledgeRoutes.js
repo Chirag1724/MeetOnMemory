@@ -2,6 +2,7 @@ import express from "express";
 import userAuth from "../middleware/userAuth.js";
 import { apiLimiter, writeLimiter } from "../middleware/rateLimiter.js";
 import { requirePermission, requireOrgMembership } from "../middleware/rbac.js";
+import { validateObjectId } from "../middleware/validateObjectId.js";
 import {
   getDecisionLineageController,
   getOpenActionItems,
@@ -70,12 +71,14 @@ router.get(
 );
 router.get(
   "/graph/snapshots/:id",
+  validateObjectId,
   requireOrgMembership,
   requirePermission("knowledge", "view"),
   getSnapshot,
 );
 router.get(
   "/graph/snapshots/:id/export",
+  validateObjectId,
   requireOrgMembership,
   requirePermission("knowledge", "view"),
   exportSnapshot,
@@ -102,6 +105,7 @@ router.post(
 );
 router.get(
   "/decisions/:id/lineage",
+  validateObjectId,
   requireOrgMembership,
   requirePermission("knowledge", "view"),
   getDecisionLineageController,
@@ -114,6 +118,7 @@ router.get(
 );
 router.patch(
   "/action-items/:id",
+  validateObjectId,
   writeLimiter,
   requireOrgMembership,
   requirePermission("tasks", "edit"),
@@ -121,6 +126,7 @@ router.patch(
 );
 router.patch(
   "/action-items/:id/reminders",
+  validateObjectId,
   writeLimiter,
   requireOrgMembership,
   requirePermission("tasks", "edit"),
@@ -128,6 +134,7 @@ router.patch(
 );
 router.patch(
   "/:type/:id/feedback",
+  validateObjectId,
   writeLimiter,
   requireOrgMembership,
   requirePermission("knowledge", "edit"),
@@ -186,6 +193,7 @@ router.post(
 );
 router.patch(
   "/:type/:id/lifecycle",
+  validateObjectId,
   writeLimiter,
   requireOrgMembership,
   requirePermission("knowledge", "manage_lifecycle"),
@@ -236,12 +244,14 @@ router.post(
 );
 router.get(
   "/conflicts/:id",
+  validateObjectId,
   requireOrgMembership,
   requirePermission("knowledge", "view"),
   getConflictDetail,
 );
 router.post(
   "/conflicts/:id/resolve",
+  validateObjectId,
   writeLimiter,
   requireOrgMembership,
   requirePermission("knowledge", "resolve_conflicts"),

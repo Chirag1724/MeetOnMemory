@@ -393,21 +393,38 @@ export const initCalendarSyncCron = () => {
     try {
       console.log("Running Calendar Sync Reconciliation Cron");
       const expiringTime = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
-      const connections = await CalendarConnection.find({
+      const connectionsCursor = CalendarConnection.find({
         syncStatus: "connected",
         tokenExpiresAt: { $lte: expiringTime },
-      });
+      }).cursor();
 
-      for (const connection of connections) {
-        if (connection.provider === "google" && connection.refreshToken) {
-          await refreshGoogleToken(connection);
-        } else if (
-          ["outlook", "microsoft"].includes(connection.provider) &&
-          connection.refreshToken
-        ) {
-          await refreshOutlookToken(connection);
+      let batch = [];
+      const batchSize = 100;
+
+      const processBatch = async () => {
+        if (batch.length === 0) return;
+        const promises = batch.map(async (connection) => {
+          if (connection.provider === "google" && connection.refreshToken) {
+            return refreshGoogleToken(connection);
+          } else if (
+            ["outlook", "microsoft"].includes(connection.provider) &&
+            connection.refreshToken
+          ) {
+            return refreshOutlookToken(connection);
+          }
+        });
+        await Promise.allSettled(promises);
+        batch = [];
+      };
+
+      for await (const connection of connectionsCursor) {
+        batch.push(connection);
+        if (batch.length >= batchSize) {
+          await processBatch();
         }
       }
+
+      await processBatch(); // process remaining connections
     } catch (error) {
       console.error("Cron job error:", error);
     }

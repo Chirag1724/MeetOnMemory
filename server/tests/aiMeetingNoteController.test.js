@@ -15,6 +15,22 @@ import {
   synthesizeAiNoteContent,
 } from "../controllers/aiMeetingNoteController.js";
 import AiMeetingNote from "../models/aiMeetingNoteModel.js";
+import Meeting from "../models/meetingModel.js";
+import { callWithResilience } from "../utils/aiResilience.js";
+
+vi.mock("../models/meetingModel.js", () => ({
+  default: {
+    findByIdAndUpdate: vi.fn(),
+  },
+}));
+
+vi.mock("../utils/aiResilience.js", () => {
+  return {
+    createCircuitBreaker: vi.fn().mockReturnValue({}),
+    callWithResilience: vi.fn().mockImplementation(async (fn) => fn()),
+    AiProviderError: class extends Error {},
+  };
+});
 
 vi.mock("../models/aiMeetingNoteModel.js", () => {
   const MockAiMeetingNote = vi.fn().mockImplementation(function (data) {
@@ -189,6 +205,37 @@ describe("aiMeetingNoteController (#2381)", () => {
           }),
         }),
       );
+    });
+
+    it("handles AI generation failure, marking meeting as failed_permanently", async () => {
+      callWithResilience.mockRejectedValueOnce(
+        new Error("Timeout or Rate Limit"),
+      );
+
+      const req = {
+        user: { id: "user-123", organization: "org-123" },
+        body: {
+          title: "Sprint Planning",
+          rawContent: "Decided to ship v2. Action: Dave will write tests.",
+          templateUsed: "product",
+          meetingType: "product",
+          meeting: "meeting-123",
+        },
+      };
+      const res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
+
+      await generateAiNote(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(503);
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          message: "AI Note generation failed due to timeout or rate limit",
+        }),
+      );
+      expect(Meeting.findByIdAndUpdate).toHaveBeenCalledWith("meeting-123", {
+        status: "failed_permanently",
+      });
     });
   });
 

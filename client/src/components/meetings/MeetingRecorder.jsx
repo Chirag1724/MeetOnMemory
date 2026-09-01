@@ -508,6 +508,23 @@ const MeetingRecorder = ({
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
       }
+      if (
+        mediaRecorderRef.current &&
+        mediaRecorderRef.current.state !== "inactive"
+      ) {
+        try {
+          mediaRecorderRef.current.stop();
+        } catch (err) {
+          console.warn("Unmount recorder stop error:", err);
+        }
+      }
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (err) {
+          console.warn("Unmount recognition stop error:", err);
+        }
+      }
     };
   }, []);
 

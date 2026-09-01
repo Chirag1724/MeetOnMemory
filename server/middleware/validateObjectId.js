@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { sendError } from "../utils/responseHelper.js";
+import { sendError } from "../utils/responseHandler.js";
 
 /**
  * Middleware to validate MongoDB ObjectIds in request parameters.

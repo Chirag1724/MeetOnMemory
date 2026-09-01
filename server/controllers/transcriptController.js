@@ -27,7 +27,10 @@ import path from "path";
 import os from "os";
 import OpenAI from "openai";
 
-import { sentimentAnalysisQueue, transcriptionQueue } from "../services/queueService.js";
+import {
+  sentimentAnalysisQueue,
+  transcriptionQueue,
+} from "../services/queueService.js";
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-tests",
 });
@@ -267,7 +270,7 @@ export const stopRecording = async (req, res) => {
       console.error("Failed to enqueue transcription:", err);
     }
 
-        res.status(200).json({
+    res.status(200).json({
       success: true,
       message: "Recording stopped, transcription started",
       transcriptId: transcript._id,
@@ -834,7 +837,7 @@ export const retryTranscription = async (req, res) => {
       console.error("Failed to enqueue transcription:", err);
     }
 
-       res.status(200).json({
+    res.status(200).json({
       success: true,
       message: "Transcription retry started",
       transcriptId: transcript._id,
@@ -906,82 +909,6 @@ export const voiceSearch = async (req, res) => {
 };
 
 /**
- * Helper function to process transcription in background
- */
-async function processTranscription(transcriptId) {
-  try {
-    const transcript = await Transcript.findById(transcriptId);
-    if (!transcript) {
-      console.error("Transcript not found for processing");
-      return;
-    }
-
-    const meetingRef = transcript.meeting?._id || transcript.meeting;
-    const meeting = await Meeting.findById(meetingRef);
-    if (meeting && (await isOrgE2eeEnforcedForMeeting(meeting))) {
-      throw new Error(
-        "Organization enforces End-to-End Encryption. Plaintext transcription is blocked.",
-      );
-    }
-
-    if (!transcript.audioFilePath || !fs.existsSync(transcript.audioFilePath)) {
-      throw new Error("Audio file not found");
-    }
-
-    console.log(`🎙️ Processing transcription for transcript ${transcriptId}`);
-
-    // Transcribe audio with segments
-    const transcriptionResult = await transcribeFileWithSegments(
-      transcript.audioFilePath,
-    );
-
-    // Update transcript with results
-    transcript.fullText = transcriptionResult.fullText;
-    transcript.segments = transcriptionResult.segments;
-    transcript.status = "completed";
-    if (!transcript.recordingTimestamps) {
-      transcript.recordingTimestamps = {};
-    }
-    transcript.recordingTimestamps.completedAt = new Date();
-    await transcript.save();
-
-    // Clean up audio file
-    if (fs.existsSync(transcript.audioFilePath)) {
-      fs.unlinkSync(transcript.audioFilePath);
-    }
-
-    console.log(`✅ Transcription completed for transcript ${transcriptId}`);
-
-    // Index transcript in Pinecone for search
-    await indexTranscript(transcript);
-
-    // Update meeting with transcript reference
-    await Meeting.findByIdAndUpdate(meetingRef, {
-      transcript: transcriptionResult.fullText,
-    });
-
-    console.log(`✅ Transcript indexed and meeting updated`);
-
-    // Queue sentiment analysis job
-    if (sentimentAnalysisQueue.isActive) {
-      await sentimentAnalysisQueue.add("analyze-sentiment", { transcriptId });
-      console.log(
-        `✅ Sentiment analysis queued for transcript ${transcriptId}`,
-      );
-    }
-  } catch (error) {
-    console.error("❌ Transcription processing failed:", error);
-
-    // Update transcript status to failed
-    const transcript = await Transcript.findById(transcriptId);
-    if (transcript) {
-      transcript.status = "failed";
-      transcript.errorMessage = error.message;
-      await transcript.save();
-    }
-  }
-}
-/**
  * @deprecated Transcription is now handled via BullMQ job queue (processTranscriptionJob).
  * This function is kept for backward compatibility but should not be called directly.
  */
@@ -990,7 +917,7 @@ async function processTranscription(transcriptId) {
     "⚠️ processTranscription called directly (deprecated). Use transcriptionQueue instead.",
   );
   // Jobs are now enqueued; this fallback is no longer used.
-}/**
+} /**
  * Get transcript by meeting ID
  */
 export const getTranscriptByMeeting = async (req, res) => {

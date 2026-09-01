@@ -7,6 +7,9 @@
  * Meeting document or a dedicated collection.
  */
 
+import mongoose from "mongoose";
+import Icebreaker from "../models/icebreakerModel.js";
+
 // In-process store keyed by meetingId.  Replaced per-request in tests via the
 // exported `_store` reference.
 export const _store = new Map();
@@ -98,24 +101,7 @@ export const getIcebreakerForMeeting = async (req, res) => {
       .status(500)
       .json({ success: false, message: "Failed to retrieve icebreaker" });
   }
-// server/controllers/icebreakerController.js
-
-import mongoose from "mongoose";
-import Icebreaker from "../models/icebreakerModel.js";
-
-/**
- * HTTP handlers for /api/icebreakers (Issue #2575).
- *
- * `icebreakerRoutes.js` imported `generate`, `select` and
- * `getActiveIcebreaker` from this module. None of them existed, so importing
- * the router threw a SyntaxError and took the whole server down with it.
- *
- * The exports this file *did* have — `selectIcebreaker` and
- * `handleIcebreakerReaction` — are socket handlers: they take `(io, roomId,
- * ...)`, not `(req, res)`, and are wired up in `socket/`. They were never
- * usable as route handlers. The three below are the HTTP surface, written
- * against `models/icebreakerModel.js`, which already described this feature.
- */
+};
 
 /** Categories the model's enum accepts. */
 const CATEGORIES = ["fun", "deep", "work-related"];
@@ -244,7 +230,7 @@ export const getActiveIcebreaker = async (req, res) => {
   }
 };
 
-// Mock persistent storage for session-scoped icebreaker states
+// Session-scoped icebreaker state for live-room socket broadcasts.
 const icebreakerSessions = {};
 
 const getSessionData = (roomId) => {
@@ -254,10 +240,9 @@ const getSessionData = (roomId) => {
   return icebreakerSessions[roomId];
 };
 
-export const selectIcebreaker = (io, roomId, icebreakerText) => {
+export const syncIcebreakerToRoom = (io, roomId, icebreakerText) => {
   const session = getSessionData(roomId);
 
-  // Push old one to history if it exists
   if (session.current) {
     session.history.unshift({
       text: session.current,
@@ -266,11 +251,9 @@ export const selectIcebreaker = (io, roomId, icebreakerText) => {
     });
   }
 
-  // Set new state
   session.current = icebreakerText;
   session.reactions = { "🔥": 0, "😂": 0, "❤️": 0, "🙌": 0 };
 
-  // Broadcast updated live state to everyone in the room
   io.to(roomId).emit("icebreaker:sync", {
     current: session.current,
     history: session.history,
@@ -284,7 +267,6 @@ export const handleIcebreakerReaction = (io, roomId, emoji) => {
     session.reactions[emoji] += 1;
   }
 
-  // Broadcast dynamic live feedback delta
   io.to(roomId).emit("icebreaker:reaction_update", {
     reactions: session.reactions,
   });

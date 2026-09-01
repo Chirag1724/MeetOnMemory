@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const TrackSchema = new mongoose.Schema(
   {
@@ -41,4 +41,4 @@ const MediaSessionSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-module.exports = mongoose.model("MediaSession", MediaSessionSchema);
+export default mongoose.model("MediaSession", MediaSessionSchema);

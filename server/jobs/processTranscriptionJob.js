@@ -2,8 +2,8 @@
 import Transcript from "../models/transcriptModel.js";
 import Meeting from "../models/meetingModel.js";
 import fs from "fs";
-import { transcribeFileWithSegments } from "../services/transcriptionService.js";
-import { indexTranscript } from "../services/indexService.js";
+import { transcribeFileWithSegments } from "../services/TranscriptionService.js";
+import { indexTranscript } from "../utils/embeddingUtils.js";
 import { sentimentAnalysisQueue } from "../services/queueService.js";
 
 /**

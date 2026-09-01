@@ -4,16 +4,21 @@ import processTranscriptionJob from "../processTranscriptionJob.js";
 import Transcript from "../../models/transcriptModel.js";
 import Meeting from "../../models/meetingModel.js";
 import fs from "fs";
-import { transcribeFileWithSegments } from "../../services/transcriptionService.js";
-import { indexTranscript } from "../../services/indexService.js";
+import { transcribeFileWithSegments } from "../../services/TranscriptionService.js";
+import { indexTranscript } from "../../utils/embeddingUtils.js";
 import { sentimentAnalysisQueue } from "../../services/queueService.js";
 
 vi.mock("../../models/transcriptModel.js");
 vi.mock("../../models/meetingModel.js");
 vi.mock("fs");
-vi.mock("../../services/transcriptionService.js");
-vi.mock("../../services/indexService.js");
-vi.mock("../../services/queueService.js");
+vi.mock("../../services/TranscriptionService.js");
+vi.mock("../../utils/embeddingUtils.js");
+vi.mock("../../services/queueService.js", () => ({
+  sentimentAnalysisQueue: {
+    isActive: true,
+    add: vi.fn(),
+  },
+}));
 
 describe("processTranscriptionJob (#2650)", () => {
   const transcriptId = "transcript_123";
@@ -55,9 +60,7 @@ describe("processTranscriptionJob (#2650)", () => {
   it("transcribes audio and updates transcript with completed status", async () => {
     await processTranscriptionJob(jobFixture);
 
-    expect(transcribeFileWithSegments).toHaveBeenCalledWith(
-      "/tmp/audio.wav",
-    );
+    expect(transcribeFileWithSegments).toHaveBeenCalledWith("/tmp/audio.wav");
     expect(transcriptFixture.fullText).toBe("Transcribed audio content");
     expect(transcriptFixture.segments).toEqual([
       { text: "Hello", speaker: "user1" },
@@ -84,9 +87,12 @@ describe("processTranscriptionJob (#2650)", () => {
   it("enqueues sentiment analysis job on success", async () => {
     await processTranscriptionJob(jobFixture);
 
-    expect(sentimentAnalysisQueue.add).toHaveBeenCalledWith("analyze-sentiment", {
-      transcriptId,
-    });
+    expect(sentimentAnalysisQueue.add).toHaveBeenCalledWith(
+      "analyze-sentiment",
+      {
+        transcriptId,
+      },
+    );
   });
 
   it("marks transcript as failed and preserves error message on failure", async () => {

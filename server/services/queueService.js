@@ -2,7 +2,8 @@ import { Queue, Worker } from "bullmq";
 import Redis from "ioredis";
 import processAiResultJob from "../jobs/processAiResultJob.js";
 import processAudioJob from "../jobs/processAudioJob.js";
-import processTranscriptionJob from "../jobs/processTranscriptionJob.js";import exportDataJob from "../jobs/exportDataJob.js";
+import processTranscriptionJob from "../jobs/processTranscriptionJob.js";
+import exportDataJob from "../jobs/exportDataJob.js";
 import cleanupExpiredExportsJob from "../jobs/cleanupExpiredExportsJob.js";
 import conflictScanJob from "./conflictDetection/conflictScanJob.js";
 import sentimentAnalysisJob from "../jobs/sentimentAnalysisJob.js";
@@ -168,9 +169,7 @@ export const embeddingReindexQueue = createQueueFacade(
   "embedding-reindex-queue",
 );
 
-export const transcriptionQueue = createQueueFacade(
-  "transcription-queue",
-);
+export const transcriptionQueue = createQueueFacade("transcription-queue");
 
 /**
  * Creates a worker, wires the standard lifecycle logging, and registers it with * the shutdown registry.
@@ -250,6 +249,13 @@ export async function initTranscriptionWorker(app) {
     processor: (job) => processTranscriptionJob(job, app),
   });
 }
+
+export const initMeetingQuizWorker = (app) =>
+  createWorker({
+    name: "meeting-quiz-queue",
+    label: "Meeting Quiz Worker",
+    processor: async (job) => await meetingQuizJob(job, app),
+  });
 
 export const initAiGenerationWorker = (app) =>
   createWorker({

@@ -37,7 +37,6 @@ const icebreakerApi = {
 };
 
 export default icebreakerApi;
-import api from "./apiClient"; // Ensure we use the pre-configured axios instance
 
 export const generateIcebreakers = async (meetingId, participantIds = []) => {
   const response = await api.post("/api/icebreakers/generate", {

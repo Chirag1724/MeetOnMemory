@@ -1,7 +1,7 @@
 import Transcript from "../models/transcriptModel.js";
 import Meeting from "../models/meetingModel.js";
 import { hasPermission } from "../utils/rbacPermissions.js";
-
+import { isMeetingTranscriptEncrypted } from "../utils/transcriptEncryption.js";
 export default (io) => {
   io.on("connection", (socket) => {
     console.log("🟢 User connected to transcript socket:", socket.id);
@@ -46,15 +46,28 @@ export default (io) => {
         socket.join(roomId);
 
         // Send current transcript status
+        // Redact plaintext content if meeting is encrypted (E2EE)
         const transcript = await Transcript.findOne({ meeting: meetingId });
         if (transcript) {
-          socket.emit("transcript-status", {
-            status: transcript.status,
-            segments: transcript.segments,
-            fullText: transcript.fullText,
-          });
-        }
+          const isEncrypted = isMeetingTranscriptEncrypted(meeting);
 
+          if (isEncrypted) {
+            // Emit metadata only for encrypted meetings
+            socket.emit("transcript-status", {
+              status: transcript.status,
+              isEncrypted: true,
+              encryptedTranscript: meeting.encryptedTranscript || null,
+              transcriptEncryptionVersion: meeting.transcriptEncryptionVersion || null,
+            });
+          } else {
+            // Emit full plaintext content for unencrypted meetings
+            socket.emit("transcript-status", {
+              status: transcript.status,
+              segments: transcript.segments,
+              fullText: transcript.fullText,
+            });
+          }
+        }
         console.log(`User ${socket.id} joined transcript room: ${roomId}`);
       } catch (error) {
         console.error("Error joining transcript room:", error);
@@ -72,7 +85,8 @@ export default (io) => {
     });
 
     // Broadcast partial transcript segment (real-time)
-    socket.on("transcript-segment", ({ meetingId, segment }) => {
+    // Redact plaintext content if meeting is encrypted (E2EE)
+    socket.on("transcript-segment", async ({ meetingId, segment }) => {
       if (!meetingId) {
         socket.emit("transcript-error", { message: "Meeting ID required" });
         return;
@@ -84,11 +98,29 @@ export default (io) => {
         });
         return;
       }
-      socket.to(roomId).emit("transcript-segment", segment);
-    });
 
+      try {
+        const meeting = await Meeting.findById(meetingId);
+        if (meeting && isMeetingTranscriptEncrypted(meeting)) {
+          // Encrypted meeting: emit empty segment with encryption flag
+          socket.to(roomId).emit("transcript-segment", {
+            isEncrypted: true,
+            timestamp: segment?.timestamp || null,
+          });
+        } else {
+          // Plaintext meeting: emit full segment content
+          socket.to(roomId).emit("transcript-segment", segment);
+        }
+      } catch (error) {
+        console.error("Error checking meeting encryption:", error);
+        socket.emit("transcript-error", {
+          message: "Failed to broadcast transcript segment",
+        });
+      }
+    });
     // Broadcast final transcript
-    socket.on("transcript-final", ({ meetingId, transcript }) => {
+    // Redact plaintext content if meeting is encrypted (E2EE)
+    socket.on("transcript-final", async ({ meetingId, transcript }) => {
       if (!meetingId) {
         socket.emit("transcript-error", { message: "Meeting ID required" });
         return;
@@ -100,9 +132,27 @@ export default (io) => {
         });
         return;
       }
-      io.to(roomId).emit("transcript-final", transcript);
-    });
 
+      try {
+        const meeting = await Meeting.findById(meetingId);
+        if (meeting && isMeetingTranscriptEncrypted(meeting)) {
+          // Encrypted meeting: emit metadata-only update
+          io.to(roomId).emit("transcript-final", {
+            isEncrypted: true,
+            meetingId: meetingId,
+            encryptionVersion: meeting.transcriptEncryptionVersion || null,
+          });
+        } else {
+          // Plaintext meeting: emit full transcript
+          io.to(roomId).emit("transcript-final", transcript);
+        }
+      } catch (error) {
+        console.error("Error checking meeting encryption:", error);
+        socket.emit("transcript-error", {
+          message: "Failed to broadcast final transcript",
+        });
+      }
+    });
     // Disconnect handling
     socket.on("disconnect", () => {
       console.log("🔴 User disconnected from transcript socket:", socket.id);

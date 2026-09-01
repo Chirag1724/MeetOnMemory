@@ -53,16 +53,31 @@ const MeetingAnalytics = () => {
   // Owns the completion poll below, including its teardown on unmount (#1455).
   const { startPolling } = usePolling();
 
+  const fetchAbortController = useRef(null);
+
   const fetchAnalytics = useCallback(async () => {
+    if (fetchAbortController.current) {
+      fetchAbortController.current.abort();
+    }
+    fetchAbortController.current = new AbortController();
+
     try {
       setLoading(true);
       setError(null);
 
       const { data } = await apiClient.get(
         `/api/analytics/meetings/${meetingId}`,
+        { signal: fetchAbortController.current.signal },
       );
       setAnalytics(data);
     } catch (err) {
+      if (
+        err.name === "CanceledError" ||
+        err.message === "canceled" ||
+        err.code === "ERR_CANCELED"
+      ) {
+        return; // Ignore canceled requests
+      }
       const data = err.response?.data;
       if (data?.status === "not_analyzed") {
         setError("not_analyzed");
@@ -72,9 +87,19 @@ const MeetingAnalytics = () => {
         toast.error("Failed to load analytics");
       }
     } finally {
-      setLoading(false);
+      if (!fetchAbortController.current?.signal.aborted) {
+        setLoading(false);
+      }
     }
   }, [meetingId]);
+
+  useEffect(() => {
+    return () => {
+      if (fetchAbortController.current) {
+        fetchAbortController.current.abort();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     fetchAnalytics();

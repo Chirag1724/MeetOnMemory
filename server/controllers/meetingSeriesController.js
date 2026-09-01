@@ -247,42 +247,82 @@ export const listSeries = async (req, res) => {
       });
     }
 
-    const seriesList = await MeetingSeries.find({ organization: orgId })
-      .sort({ updatedAt: -1 })
-      .lean();
-
     const now = new Date();
-    const enriched = await Promise.all(
-      seriesList.map(async (series) => {
-        const [nextMeeting, occurrenceCount] = await Promise.all([
-          Meeting.findOne({
-            series: series._id,
-            organization: orgId,
-            date: { $gte: now },
-          })
-            .sort({ date: 1 })
-            .select("date time title seriesOccurrence")
-            .lean(),
-          Meeting.countDocuments({ series: series._id, organization: orgId }),
-        ]);
 
-        return {
-          ...series,
-          status: series.isActive ? "active" : "paused",
-          occurrenceCount,
-          nextOccurrence: nextMeeting
-            ? {
-                date: nextMeeting.date,
-                time: nextMeeting.time,
-                title: nextMeeting.title,
-                seriesOccurrence: nextMeeting.seriesOccurrence,
-              }
-            : null,
-        };
-      }),
-    );
+    const enriched = await MeetingSeries.aggregate([
+      { $match: { organization: new mongoose.Types.ObjectId(orgId) } },
+      { $sort: { updatedAt: -1 } },
+      {
+        $lookup: {
+          from: "meetings",
+          let: { seriesId: "$_id", orgId: "$organization" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$series", "$$seriesId"] },
+                    { $eq: ["$organization", "$$orgId"] },
+                  ],
+                },
+              },
+            },
+            { $group: { _id: null, count: { $sum: 1 } } },
+          ],
+          as: "occurrenceData",
+        },
+      },
+      {
+        $lookup: {
+          from: "meetings",
+          let: { seriesId: "$_id", orgId: "$organization", now: now },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$series", "$$seriesId"] },
+                    { $eq: ["$organization", "$$orgId"] },
+                    { $gte: ["$date", "$$now"] },
+                  ],
+                },
+              },
+            },
+            { $sort: { date: 1 } },
+            { $limit: 1 },
+            { $project: { date: 1, time: 1, title: 1, seriesOccurrence: 1 } },
+          ],
+          as: "nextMeetingData",
+        },
+      },
+    ]);
 
-    res.json({ success: true, series: enriched });
+    const formattedSeries = enriched.map((series) => {
+      const occurrenceCount =
+        series.occurrenceData.length > 0 ? series.occurrenceData[0].count : 0;
+      const nextMeeting =
+        series.nextMeetingData.length > 0 ? series.nextMeetingData[0] : null;
+
+      // Remove the temporary aggregation fields
+      delete series.occurrenceData;
+      delete series.nextMeetingData;
+
+      return {
+        ...series,
+        status: series.isActive ? "active" : "paused",
+        occurrenceCount,
+        nextOccurrence: nextMeeting
+          ? {
+              date: nextMeeting.date,
+              time: nextMeeting.time,
+              title: nextMeeting.title,
+              seriesOccurrence: nextMeeting.seriesOccurrence,
+            }
+          : null,
+      };
+    });
+
+    res.json({ success: true, series: formattedSeries });
   } catch (error) {
     console.error("Error listing meeting series:", error);
     res.status(500).json({

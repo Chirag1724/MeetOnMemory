@@ -1,6 +1,6 @@
 import Meeting from "../models/meetingModel.js";
 import ActionItem from "../models/actionItemModel.js";
-
+import Decision from "../models/decisionModel.js";
 /**
  * @desc Extracts and structures all relevant meeting data for template rendering.
  * Flattens nested objects and formats dates for Handlebars compatibility.
@@ -57,10 +57,9 @@ class DataExtractor {
           status: item.status,
         })),
 
-        // Placeholder for decisions (would come from a Decisions model if exists)
-        decisions: meeting.decisions || [],
+        // Populate decisions from the authoritative Decision model
+        decisions: await this.extractDecisionsForMeeting(meetingId),
       },
-
       // Metadata for the export itself
       exportMeta: {
         generatedAt: new Date(),
@@ -96,6 +95,30 @@ class DataExtractor {
     }
 
     return filtered;
+  }
+
+  /**
+   * Extracts decisions for a specific meeting from the Decision model.
+   * Returns only the decision text for template compatibility.
+   * @param {string} meetingId
+   * @returns {Promise<Array>} Array of decision text strings.
+   */
+  static async extractDecisionsForMeeting(meetingId) {
+    try {
+      const decisions = await Decision.find({
+        sourceMeetingId: meetingId,
+      })
+        .select("text status")
+        .sort({ createdAt: -1 });
+
+      return decisions.map((d) => d.text);
+    } catch (error) {
+      console.warn(
+        "Error extracting decisions for meeting export:",
+        error.message,
+      );
+      return [];
+    }
   }
 }
 

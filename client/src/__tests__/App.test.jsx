@@ -88,7 +88,7 @@ vi.mock("../pages/MeetingRoom.jsx", () => ({
 }));
 
 describe("App Routing", () => {
-  it("renders Home on the root path (PublicRoute)", () => {
+  it("renders Home on the root path (PublicRoute)", async () => {
     render(
       <MemoryRouter initialEntries={["/"]}>
         <AppContent.Provider value={{ isLoggedin: false }}>
@@ -96,14 +96,14 @@ describe("App Routing", () => {
         </AppContent.Provider>
       </MemoryRouter>,
     );
-    expect(screen.getByTestId("home-page")).toBeInTheDocument();
+    expect(await screen.findByTestId("home-page")).toBeInTheDocument();
 
     // Check conditional layouts
     expect(screen.getByTestId("footer")).toBeInTheDocument();
     expect(screen.getByTestId("scroll-navigator")).toBeInTheDocument();
   });
 
-  it("renders Login and hides Footer on /login", () => {
+  it("renders Login and hides Footer on /login", async () => {
     render(
       <MemoryRouter initialEntries={["/login"]}>
         <AppContent.Provider value={{ isLoggedin: false }}>
@@ -111,14 +111,14 @@ describe("App Routing", () => {
         </AppContent.Provider>
       </MemoryRouter>,
     );
-    expect(screen.getByTestId("login-page")).toBeInTheDocument();
+    expect(await screen.findByTestId("login-page")).toBeInTheDocument();
 
     // Check conditional layouts
     expect(screen.queryByTestId("footer")).not.toBeInTheDocument();
     expect(screen.queryByTestId("scroll-navigator")).not.toBeInTheDocument();
   });
 
-  it("renders SignUp and hides Footer on /signup", () => {
+  it("renders SignUp and hides Footer on /signup", async () => {
     render(
       <MemoryRouter initialEntries={["/signup"]}>
         <AppContent.Provider value={{ isLoggedin: false }}>
@@ -126,11 +126,11 @@ describe("App Routing", () => {
         </AppContent.Provider>
       </MemoryRouter>,
     );
-    expect(screen.getByTestId("signup-page")).toBeInTheDocument();
+    expect(await screen.findByTestId("signup-page")).toBeInTheDocument();
     expect(screen.queryByTestId("footer")).not.toBeInTheDocument();
   });
 
-  it("renders Dashboard inside ProtectedRoute (ProtectedRoute)", () => {
+  it("renders Dashboard inside ProtectedRoute (ProtectedRoute)", async () => {
     render(
       <MemoryRouter initialEntries={["/dashboard"]}>
         <AppContent.Provider value={{ isLoggedin: true }}>
@@ -138,12 +138,12 @@ describe("App Routing", () => {
         </AppContent.Provider>
       </MemoryRouter>,
     );
-    expect(screen.getByTestId("protected-route")).toBeInTheDocument();
-    expect(screen.getByTestId("dashboard-page")).toBeInTheDocument();
+    expect(await screen.findByTestId("protected-route")).toBeInTheDocument();
+    expect(await screen.findByTestId("dashboard-page")).toBeInTheDocument();
     expect(screen.getByTestId("footer")).toBeInTheDocument();
   });
 
-  it("hides Footer on the live MeetingRoom route (#1647)", () => {
+  it("hides Footer on the live MeetingRoom route (#1647)", async () => {
     render(
       <MemoryRouter initialEntries={["/meeting-room/room-123"]}>
         <AppContent.Provider value={{ isLoggedin: true }}>
@@ -152,11 +152,11 @@ describe("App Routing", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByTestId("meeting-room-page")).toBeInTheDocument();
+    expect(await screen.findByTestId("meeting-room-page")).toBeInTheDocument();
     expect(screen.queryByTestId("footer")).not.toBeInTheDocument();
   });
 
-  it("renders NotFound page as fallback on unknown paths", () => {
+  it("renders NotFound page as fallback on unknown paths", async () => {
     render(
       <MemoryRouter initialEntries={["/unknown-path-that-does-not-exist"]}>
         <AppContent.Provider value={{ isLoggedin: false }}>
@@ -165,7 +165,7 @@ describe("App Routing", () => {
       </MemoryRouter>,
     );
     // Since fallback route maps to <NotFound />
-    expect(screen.getByTestId("not-found-page")).toBeInTheDocument();
+    expect(await screen.findByTestId("not-found-page")).toBeInTheDocument();
   });
 
   it("does not render the custom glowing cursor overlay (#729)", () => {

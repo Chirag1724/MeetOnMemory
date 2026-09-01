@@ -30,6 +30,10 @@ const ROOT_CLIENT_MAP = {
     "client/src/pages/__tests__/AcceptInvite.test.jsx",
   "client/src/services/index.js":
     "client/src/pages/__tests__/SessionGallery.test.jsx",
+  "client/src/services/briefingApi.js":
+    "client/src/pages/__tests__/MeetingBriefing.test.jsx",
+  "client/src/pages/DecisionTrackingDashboard.jsx":
+    "client/src/pages/__tests__/DecisionTrackingDashboard.test.jsx",
   "client/src/services/meetingApi.js":
     "client/src/pages/__tests__/SessionGallery.test.jsx",
   "client/src/services/sessionCardApi.js":

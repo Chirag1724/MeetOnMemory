@@ -124,6 +124,9 @@
       "name": "Decision Log"
     },
     {
+      "name": "Decision Logs"
+    },
+    {
       "name": "Decisions"
     },
     {
@@ -12457,6 +12460,28 @@
         }
       }
     },
+ feature/wire-decision-dashboard-2440
+    "/api/decision-log/analytics": {
+      "get": {
+        "tags": ["Decision Log"],
+        "summary": "GET /api/decision-log/analytics",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+
+ main
     "/api/decision-log/timeline": {
       "get": {
         "tags": ["Decision Log"],
@@ -12555,6 +12580,8 @@
       "put": {
         "tags": ["Decision Log"],
         "summary": "PUT /api/decision-log/{id}",
+ feature/wire-decision-dashboard-2440
+
         "security": [
           {
             "bearerAuth": []
@@ -12581,6 +12608,274 @@
       "delete": {
         "tags": ["Decision Log"],
         "summary": "DELETE /api/decision-log/{id}",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/decisions/impact/report": {
+      "get": {
+        "tags": ["Decisions"],
+        "summary": "GET /api/decisions/impact/report",
+ main
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Decision Log"],
+        "summary": "DELETE /api/decision-log/{id}",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/decision-logs": {
+      "get": {
+        "tags": ["Decision Logs"],
+        "summary": "GET /api/decision-logs",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Decision Logs"],
+        "summary": "POST /api/decision-logs",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/decision-logs/export": {
+      "get": {
+        "tags": ["Decision Logs"],
+        "summary": "GET /api/decision-logs/export",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/decision-logs/analytics": {
+      "get": {
+        "tags": ["Decision Logs"],
+        "summary": "GET /api/decision-logs/analytics",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/decision-logs/timeline": {
+      "get": {
+        "tags": ["Decision Logs"],
+        "summary": "GET /api/decision-logs/timeline",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/decision-logs/overdue": {
+      "get": {
+        "tags": ["Decision Logs"],
+        "summary": "GET /api/decision-logs/overdue",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/decision-logs/{id}/outcome": {
+      "put": {
+        "tags": ["Decision Logs"],
+        "summary": "PUT /api/decision-logs/{id}/outcome",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/decision-logs/{id}/link-action-items": {
+      "put": {
+        "tags": ["Decision Logs"],
+        "summary": "PUT /api/decision-logs/{id}/link-action-items",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/decision-logs/{id}": {
+      "put": {
+        "tags": ["Decision Logs"],
+        "summary": "PUT /api/decision-logs/{id}",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Decision Logs"],
+        "summary": "DELETE /api/decision-logs/{id}",
         "security": [
           {
             "bearerAuth": []

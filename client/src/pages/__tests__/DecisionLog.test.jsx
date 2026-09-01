@@ -1,12 +1,17 @@
 import React from "react";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import DecisionLog from "../DecisionLog.jsx";
 import {
   getDecisionLog,
   getDecisionTimeline,
   updateDecisionOutcome,
 } from "../../services/decisionLogApi";
+
+vi.mock("../../components/Navbar.jsx", () => ({
+  default: () => <div data-testid="mock-navbar" />,
+}));
 
 vi.mock("../../services/decisionLogApi", () => ({
   getDecisionLog: vi.fn(),
@@ -62,7 +67,11 @@ describe("DecisionLog Page Component", () => {
     getDecisionLog.mockResolvedValueOnce({ entries: mockLogEntries });
     getDecisionTimeline.mockResolvedValueOnce(mockTimeline);
 
-    render(<DecisionLog />);
+    render(
+      <MemoryRouter>
+        <DecisionLog />
+      </MemoryRouter>,
+    );
 
     expect(screen.getByText("Decision Log")).toBeInTheDocument();
     expect(screen.getByRole("combobox")).toBeInTheDocument();
@@ -72,9 +81,13 @@ describe("DecisionLog Page Component", () => {
     getDecisionLog.mockResolvedValueOnce({ entries: mockLogEntries });
     getDecisionTimeline.mockResolvedValueOnce(mockTimeline);
 
-    render(<DecisionLog />);
+    render(
+      <MemoryRouter>
+        <DecisionLog />
+      </MemoryRouter>,
+    );
 
-    expect(screen.getByText("Loading...")).toBeInTheDocument();
+    expect(screen.getByTestId("loader-spinner")).toBeInTheDocument();
 
     await waitFor(() => {
       expect(
@@ -88,10 +101,14 @@ describe("DecisionLog Page Component", () => {
     getDecisionLog.mockResolvedValueOnce({ entries: [] });
     getDecisionTimeline.mockResolvedValueOnce([]);
 
-    render(<DecisionLog />);
+    render(
+      <MemoryRouter>
+        <DecisionLog />
+      </MemoryRouter>,
+    );
 
     await waitFor(() => {
-      expect(screen.getByText("No decisions found.")).toBeInTheDocument();
+      expect(screen.getByText("No decisions recorded.")).toBeInTheDocument();
     });
   });
 
@@ -99,7 +116,11 @@ describe("DecisionLog Page Component", () => {
     getDecisionLog.mockResolvedValueOnce({ entries: mockLogEntries });
     getDecisionTimeline.mockResolvedValueOnce(mockTimeline);
 
-    render(<DecisionLog />);
+    render(
+      <MemoryRouter>
+        <DecisionLog />
+      </MemoryRouter>,
+    );
 
     await waitFor(() => {
       expect(
@@ -111,9 +132,8 @@ describe("DecisionLog Page Component", () => {
     fireEvent.click(screen.getByText("Use Vitest for unit testing"));
 
     expect(screen.getByText("Improved test speed by 50%")).toBeInTheDocument();
-    expect(
-      screen.getByText("Configure vitest - completed"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Configure vitest")).toBeInTheDocument();
+    expect(screen.getByText("completed")).toBeInTheDocument();
   });
 
   it("allows updating decision outcome in expanded panel", async () => {
@@ -121,7 +141,11 @@ describe("DecisionLog Page Component", () => {
     getDecisionTimeline.mockResolvedValue(mockTimeline);
     updateDecisionOutcome.mockResolvedValueOnce({ success: true });
 
-    render(<DecisionLog />);
+    render(
+      <MemoryRouter>
+        <DecisionLog />
+      </MemoryRouter>,
+    );
 
     await waitFor(() => {
       expect(

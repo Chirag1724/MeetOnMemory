@@ -105,6 +105,19 @@ const vitestOwnedSources = new Set([
   "server/routes/auditRoutes.js",
   "server/controllers/standupController.js",
   "server/routes/standupRoutes.js",
+  "server/controllers/decisionLogController.js",
+  "server/routes/decisionLogRoutes.js",
+  "server/services/decisionLogService.js",
+  "server/routes/index.js",
+]);
+const VITEST_SOURCE_TEST_MAP = {
+  "server/controllers/decisionLogController.js":
+    "server/tests/decisionLogAnalytics.vitest.test.js",
+  "server/routes/decisionLogRoutes.js":
+    "server/tests/decisionLogAnalytics.vitest.test.js",
+  "server/services/decisionLogService.js":
+    "server/tests/decisionLogAnalytics.vitest.test.js",
+
   "server/controllers/preMeetingBriefingController.js",
   "server/routes/preMeetingBriefingRoutes.js",
   "server/routes/index.js",
@@ -114,6 +127,7 @@ const VITEST_SOURCE_TEST_MAP = {
     "server/tests/preMeetingBriefingController.vitest.test.js",
   "server/routes/preMeetingBriefingRoutes.js":
     "server/tests/preMeetingBriefingController.vitest.test.js",
+ main
   "server/routes/auditRoutes.js": "server/__tests__/audit.test.js",
   "server/controllers/standupController.js":
     "server/tests/standupController.vitest.test.js",

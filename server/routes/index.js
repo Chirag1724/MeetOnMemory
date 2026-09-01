@@ -198,7 +198,7 @@ router.use("/api/comparison", comparisonRoutes);
 router.use("/api/dashboard", dashboardRoutes);
 router.use("/api/digest-preferences", digestRoutes);
 router.use("/api/decision-graph", decisionGraphRoutes);
-router.use("/api/decision-log", decisionLogRoutes);
+router.use(["/api/decision-log", "/api/decision-logs"], decisionLogRoutes);
 router.use("/api/decisions", decisionImpactRoutes);
 router.use("/api/mindmap", mindMapRoutes);
 router.use("/api/attendance-analytics", attendanceAnalyticsRoutes);

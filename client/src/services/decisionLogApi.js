@@ -15,6 +15,13 @@ export const getDecisionLog = async (options = {}) => {
   return response.data;
 };
 
+export const getDecisionAnalytics = async (filters = {}) => {
+  const response = await apiClient.get("/api/decision-log/analytics", {
+    params: filters,
+  });
+  return response.data;
+};
+
 export const getDecisionTimeline = async () => {
   const response = await apiClient.get("/api/decision-log/timeline");
   return response.data;

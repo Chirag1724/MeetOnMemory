@@ -171,11 +171,21 @@ class ResourceBookingService {
 
   /**
    * Cancel (delete or set status to CANCELLED) a booking.
+   *
+   * Issue #2571: when `organizationId` is supplied the delete is scoped to
+   * that tenant, so a caller can never remove another organization's booking
+   * even if the id leaks.
+   *
+   * @param {string} bookingId
+   * @param {string|null} organizationId caller's organization (server-resolved)
    */
-  async cancelBooking(bookingId) {
-    const booking = await ResourceBooking.findById(bookingId);
+  async cancelBooking(bookingId, organizationId = null) {
+    const filter = { _id: bookingId };
+    if (organizationId) filter.organization = organizationId;
+
+    const booking = await ResourceBooking.findOne(filter);
     if (!booking) return null;
-    return await ResourceBooking.findByIdAndDelete(bookingId);
+    return await ResourceBooking.findByIdAndDelete(booking._id);
   }
 
   /**
@@ -218,12 +228,21 @@ class ResourceBookingService {
 
   /**
    * Get bookings for a specific meeting.
+   *
+   * Issue #2571: `organizationId` scopes the lookup to the caller's tenant, so
+   * a meeting id belonging to another organization returns nothing.
+   *
+   * @param {string} meetingId
+   * @param {string|null} organizationId caller's organization (server-resolved)
    */
-  async getBookingsForMeeting(meetingId) {
-    return await ResourceBooking.find({
+  async getBookingsForMeeting(meetingId, organizationId = null) {
+    const query = {
       meetingId,
       status: { $ne: "CANCELLED" },
-    }).populate("resourceId");
+    };
+    if (organizationId) query.organization = organizationId;
+
+    return await ResourceBooking.find(query).populate("resourceId");
   }
 
   /**

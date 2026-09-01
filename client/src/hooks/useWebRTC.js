@@ -1,4 +1,4 @@
-import { useState, useRef, useContext, useMemo } from "react";
+import { useState, useRef, useContext, useMemo, useEffect } from "react";
 import AppContent from "../context/AppContent.js";
 import { io } from "socket.io-client";
 import Peer from "simple-peer";
@@ -43,6 +43,26 @@ export default function useWebRTC(roomId, callbacks) {
   const screenTrackRef = useRef(null);
   const screenIntervalRef = useRef(null);
   const peersRef = useRef([]);
+  const signalQueueRef = useRef({});
+
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+      }
+      if (screenTrackRef.current) {
+        screenTrackRef.current.getTracks().forEach((t) => t.stop());
+      }
+      if (screenIntervalRef.current) {
+        clearInterval(screenIntervalRef.current);
+      }
+      peersRef.current.forEach((p) => p.peer && p.peer.destroy());
+      if (socketRef.current) {
+        socketRef.current.removeAllListeners();
+        socketRef.current.disconnect();
+      }
+    };
+  }, []);
 
   const joinMeeting = async (providedStream = null, joinOptions = {}) => {
     try {
@@ -95,6 +115,12 @@ export default function useWebRTC(roomId, callbacks) {
             peer,
             userInfo: user,
           });
+          if (signalQueueRef.current[user.socketId]) {
+            signalQueueRef.current[user.socketId].forEach((sig) =>
+              peer.signal(sig),
+            );
+            delete signalQueueRef.current[user.socketId];
+          }
         });
         setPeers(peersArr);
       });
@@ -108,6 +134,12 @@ export default function useWebRTC(roomId, callbacks) {
           userInfo: user,
         });
         setPeers([...peersRef.current]);
+        if (signalQueueRef.current[user.socketId]) {
+          signalQueueRef.current[user.socketId].forEach((sig) =>
+            peer.signal(sig),
+          );
+          delete signalQueueRef.current[user.socketId];
+        }
       });
 
       socketRef.current.on("user-joined-signal", (payload) => {
@@ -116,6 +148,11 @@ export default function useWebRTC(roomId, callbacks) {
         );
         if (item) {
           item.peer.signal(payload.signal);
+        } else {
+          if (!signalQueueRef.current[payload.callerID]) {
+            signalQueueRef.current[payload.callerID] = [];
+          }
+          signalQueueRef.current[payload.callerID].push(payload.signal);
         }
       });
 
@@ -123,6 +160,11 @@ export default function useWebRTC(roomId, callbacks) {
         const item = peersRef.current.find((p) => p.peerID === payload.id);
         if (item) {
           item.peer.signal(payload.signal);
+        } else {
+          if (!signalQueueRef.current[payload.id]) {
+            signalQueueRef.current[payload.id] = [];
+          }
+          signalQueueRef.current[payload.id].push(payload.signal);
         }
       });
 
@@ -324,10 +366,10 @@ export default function useWebRTC(roomId, callbacks) {
   };
 
   const stopScreenShare = () => {
-    const videoTrack = streamRef.current.getVideoTracks()[0];
+    const videoTrack = streamRef.current?.getVideoTracks()[0];
     peersRef.current.forEach(({ peer }) => {
       const currentTrack = screenTrackRef.current?.getTracks()[0];
-      if (currentTrack) {
+      if (currentTrack && videoTrack) {
         peer.replaceTrack(currentTrack, videoTrack, streamRef.current);
       }
     });

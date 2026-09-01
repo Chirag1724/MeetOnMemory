@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useTransition } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -6,52 +6,141 @@ import {
   HelpCircle,
   Calendar,
   CheckCircle2,
+  Share2,
+  FileDown,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
-import { getBriefing, generateBriefing } from "../services/briefingApi.js";
-import Navbar from "../components/Navbar";
+import { toast } from "react-toastify";
+import {
+  getBriefing,
+  regenerateBriefing,
+  shareBriefing,
+} from "../services/briefingApi.js";
+import Navbar from "../components/Navbar.jsx";
 
-const MeetingBriefing = () => {
+export default function MeetingBriefing({ initialBriefing = null }) {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [briefing, setBriefing] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [regenerating, setRegenerating] = useState(false);
+  const [briefing, setBriefing] = useState(initialBriefing);
+  const [loading, setLoading] = useState(!initialBriefing && !!id);
+  const [processing, setProcessing] = useState(false);
+  const [, startTransition] = useTransition();
 
   useEffect(() => {
+    if (initialBriefing) {
+      setBriefing(initialBriefing);
+      setLoading(false);
+      return;
+    }
+
+    if (!id) {
+      setLoading(false);
+      return;
+    }
+
+    let isMounted = true;
     const fetchBriefing = async () => {
       try {
-        const data = await getBriefing(id);
-        setBriefing(data);
+        setLoading(true);
+        // Try fetch briefing via API or fallback fetch
+        const res = await getBriefing(id);
+        const data = res?.briefing || res?.data || res;
+        if (isMounted && data) {
+          setBriefing(data);
+        }
       } catch (error) {
         console.error("Failed to load briefing:", error);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchBriefing();
-  }, [id]);
+    return () => {
+      isMounted = false;
+    };
+  }, [id, initialBriefing]);
 
   const handleRegenerate = async () => {
-    setRegenerating(true);
-    try {
-      await generateBriefing(id);
+    const confirmed = window.confirm(
+      "Are you sure you want to regenerate this briefing? This will overwrite current insights with the latest data tracks.",
+    );
+    if (!confirmed) return;
 
-      // Since it's async, we just poll once after a delay
-      setTimeout(async () => {
-        try {
-          const data = await getBriefing(id);
-          setBriefing(data);
-        } catch (err) {
-          console.error("Failed to fetch regenerated briefing:", err);
-        } finally {
-          setLoading(false);
-          setRegenerating(false);
+    setProcessing(true);
+    try {
+      let data;
+      try {
+        const response = await fetch(`/api/meeting/${id}/briefing/regenerate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
+        data = await response.json();
+      } catch {
+        data = await regenerateBriefing(id);
+      }
+
+      if (data?.success && data?.briefing) {
+        startTransition(() => {
+          setBriefing(data.briefing);
+        });
+        toast.success("Pre-meeting briefing refreshed with latest context!");
+      } else if (data?.briefing) {
+        startTransition(() => {
+          setBriefing(data.briefing);
+        });
+      }
+    } catch (err) {
+      console.error("Regeneration failed", err);
+      toast.error("Failed to regenerate briefing.");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleShare = async () => {
+    setProcessing(true);
+    try {
+      let data;
+      try {
+        const response = await fetch(`/api/meeting/${id}/briefing/share`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
+        data = await response.json();
+      } catch {
+        data = await shareBriefing(id);
+      }
+
+      if (data?.success) {
+        const message =
+          data.message ||
+          "Briefing successfully emailed to all meeting participants!";
+        if (
+          typeof window !== "undefined" &&
+          typeof window.alert === "function"
+        ) {
+          window.alert(message);
         }
-      }, 3000);
-    } catch (error) {
-      console.error("Failed to regenerate briefing:", error);
-      setRegenerating(false);
+        toast.success(message);
+      } else {
+        toast.error(data?.message || "Failed to share briefing.");
+      }
+    } catch (err) {
+      console.error("Sharing failed", err);
+      toast.error("Failed to share briefing with attendees.");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleExportPDF = () => {
+    // Triggers print service styling optimized for PDF generation via CSS @media print
+    if (typeof window !== "undefined" && typeof window.print === "function") {
+      window.print();
     }
   };
 
@@ -59,8 +148,11 @@ const MeetingBriefing = () => {
     return (
       <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 transition-colors">
         <Navbar />
-        <div className="flex justify-center items-center h-64 mt-10">
-          <div className="w-8 h-8 border-4 border-indigo-500 rounded-full border-t-transparent animate-spin"></div>
+        <div className="flex flex-col justify-center items-center h-64 mt-10">
+          <Loader2 className="w-8 h-8 text-indigo-500 animate-spin mb-3" />
+          <p className="text-sm text-slate-500 dark:text-gray-400">
+            Loading Pre-Meeting Briefing Canvas...
+          </p>
         </div>
       </div>
     );
@@ -72,8 +164,8 @@ const MeetingBriefing = () => {
         <Navbar />
         <div className="max-w-4xl px-4 py-8 mx-auto mt-4">
           <button
-            onClick={() => navigate(`/meeting/${id}`)}
-            className="flex items-center gap-2 mb-4 text-slate-600 hover:text-slate-900 dark:text-gray-400 dark:hover:text-gray-100"
+            onClick={() => navigate(id ? `/meeting/${id}` : "/dashboard")}
+            className="flex items-center gap-2 mb-4 text-slate-600 hover:text-slate-900 dark:text-gray-400 dark:hover:text-gray-100 print:hidden"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Meeting
@@ -82,17 +174,17 @@ const MeetingBriefing = () => {
             <h2 className="mb-2 text-xl font-semibold text-gray-900 dark:text-white">
               Briefing Unavailable
             </h2>
-            <p className="mb-6 text-gray-600 dark:text-gray-400">
+            <p className="mb-6 text-gray-600 dark:text-gray-400 text-sm">
               The AI briefing for this meeting has not been generated or failed
-              to generate.
+              to compile latest context.
             </p>
             <button
               onClick={handleRegenerate}
-              disabled={regenerating}
-              className="inline-flex items-center gap-2 px-4 py-2 font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+              disabled={processing}
+              className="inline-flex items-center gap-2 px-4 py-2 font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50 transition-colors text-sm"
             >
               <Sparkles className="w-4 h-4" />
-              {regenerating ? "Generating..." : "Generate Briefing"}
+              {processing ? "Generating..." : "Generate Briefing"}
             </button>
           </div>
         </div>
@@ -100,128 +192,194 @@ const MeetingBriefing = () => {
     );
   }
 
+  const title =
+    briefing.title || briefing.meetingTitle || "Strategic Pre-Meeting Briefing";
+  const summaryContent =
+    briefing.content ||
+    briefing.executiveSummary ||
+    "No structural breakdown compiled yet. Use the action items deck to trigger intelligence sync inputs.";
+
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 transition-colors">
-      <Navbar />
-      <div className="max-w-4xl px-4 py-8 mx-auto mt-4 mb-8">
-        <div className="flex items-center justify-between mb-6">
-          <button
-            onClick={() => navigate(`/meeting/${id}`)}
-            className="flex items-center gap-2 text-slate-600 hover:text-slate-900 dark:text-gray-400 dark:hover:text-gray-100"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Meeting
-          </button>
-          <button
-            onClick={handleRegenerate}
-            disabled={regenerating}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors bg-white border border-gray-300 rounded-lg text-slate-700 hover:bg-gray-50 disabled:opacity-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
-          >
-            <Sparkles className="w-4 h-4" />
-            {regenerating ? "Regenerating..." : "Regenerate"}
-          </button>
-        </div>
+    <div className="min-h-screen bg-zinc-950 text-white p-6 space-y-6 print:bg-white print:text-black print:p-0">
+      <div className="print:hidden">
+        <Navbar />
+      </div>
 
-        <div className="p-6 bg-white border border-gray-200 shadow-lg rounded-2xl md:p-8 dark:bg-gray-800 dark:border-gray-700 shadow-slate-200/50 dark:shadow-none">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="flex items-center justify-center p-3 text-white rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600">
-              <Sparkles className="w-6 h-6" />
+      <div className="max-w-5xl mx-auto space-y-6">
+        {/* Navigation & Controls Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden pt-4">
+          <div>
+            <div className="flex items-center gap-3">
+              {id && (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/meeting/${id}`)}
+                  className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+                  title="Back to meeting"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+              )}
+              <h1 className="text-xl font-bold tracking-tight text-white">
+                Pre-Meeting Briefing Canvas
+              </h1>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 md:text-3xl dark:text-white">
-              Pre-Meeting Briefing
-            </h1>
-          </div>
-
-          <div className="mb-8">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
-              Executive Summary
-            </h2>
-            <p className="leading-relaxed text-gray-700 whitespace-pre-line dark:text-gray-300">
-              {briefing.executiveSummary}
+            <p className="text-xs text-zinc-400 mt-1">
+              Review, regenerate, and distribute strategic summaries to your
+              attendees.
             </p>
           </div>
 
-          <hr className="my-8 border-gray-200 dark:border-gray-700" />
+          {/* Action Controls Deck */}
+          <div className="flex flex-wrap gap-2 items-center">
+            <button
+              type="button"
+              onClick={handleRegenerate}
+              disabled={processing}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-xs font-semibold rounded-lg disabled:opacity-50 transition-colors text-zinc-200"
+            >
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${processing ? "animate-spin" : ""}`}
+              />
+              <span>🔄 Regenerate</span>
+            </button>
 
+            <button
+              type="button"
+              onClick={handleShare}
+              disabled={processing}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-xs font-semibold rounded-lg synchronized-share-trigger disabled:opacity-50 transition-colors text-white shadow-sm shadow-purple-900/30"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>📥 Share with Attendees</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportPDF}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-950 text-xs font-semibold rounded-lg transition-colors shadow-sm"
+            >
+              <FileDown className="w-3.5 h-3.5" />
+              <span>📄 Export PDF</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Briefing Canvas Content Area */}
+        <div className="p-6 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-xl space-y-6 print:border-0 print:p-0 print:bg-transparent print:shadow-none">
+          {/* Canvas Header */}
+          <div className="border-b border-zinc-800 pb-4 print:border-black">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center p-2.5 rounded-xl bg-linear-to-br from-indigo-500 to-purple-600 text-white print:hidden">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-zinc-100 print:text-black">
+                  {title}
+                </h2>
+                <p className="text-xs text-zinc-400 print:text-gray-600">
+                  Automated Pre-Meeting Intelligence Package
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Executive Summary */}
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-purple-400 print:text-black">
+              Executive Summary
+            </h3>
+            <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-line print:text-black">
+              {summaryContent}
+            </p>
+          </div>
+
+          {/* Suggested Strategic Questions */}
           {briefing.suggestedQuestions &&
             briefing.suggestedQuestions.length > 0 && (
-              <div className="mb-8">
-                <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
+              <div className="border-t border-zinc-800/80 pt-5 space-y-3 print:border-gray-300">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-indigo-400 print:text-black">
                   Suggested Strategic Questions
-                </h2>
-                <ul className="space-y-3">
-                  {briefing.suggestedQuestions.map((q, idx) => (
-                    <li key={idx} className="flex items-start gap-3">
-                      <HelpCircle className="w-5 h-5 mt-0.5 text-indigo-500 shrink-0" />
-                      <span className="font-medium text-gray-700 dark:text-gray-300">
-                        {q}
-                      </span>
+                </h3>
+                <ul className="space-y-2.5">
+                  {briefing.suggestedQuestions.map((question, idx) => (
+                    <li
+                      key={idx}
+                      className="flex items-start gap-2.5 text-sm text-zinc-300 print:text-black"
+                    >
+                      <HelpCircle className="w-4 h-4 mt-0.5 text-indigo-400 shrink-0 print:hidden" />
+                      <span>{question}</span>
                     </li>
                   ))}
                 </ul>
               </div>
             )}
 
+          {/* Open Action Items & Related Past Meetings Grid */}
           {(briefing.openActionItems?.length > 0 ||
             briefing.relatedPastMeetings?.length > 0) && (
-            <hr className="my-8 border-gray-200 dark:border-gray-700" />
-          )}
-
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-            {briefing.openActionItems &&
-              briefing.openActionItems.length > 0 && (
-                <div>
-                  <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
-                    Pending Action Items
-                  </h2>
-                  <ul className="space-y-4">
-                    {briefing.openActionItems.map((item, idx) => (
-                      <li key={idx} className="flex items-start gap-3">
-                        <CheckCircle2 className="w-5 h-5 mt-0.5 text-amber-500 shrink-0" />
-                        <div>
-                          <p className="font-medium text-gray-900 dark:text-white">
-                            {item.text}
-                          </p>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
-                            Owner: {item.owner}
-                          </p>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-            {briefing.relatedPastMeetings &&
-              briefing.relatedPastMeetings.length > 0 && (
-                <div>
-                  <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
-                    Related Past Context
-                  </h2>
-                  <ul className="space-y-4">
-                    {briefing.relatedPastMeetings.map((m, idx) => (
-                      <li key={idx} className="flex items-start gap-3">
-                        <Calendar className="w-5 h-5 mt-0.5 text-emerald-500 shrink-0" />
-                        <div>
-                          <p className="font-medium text-gray-900 dark:text-white">
-                            {m.title}
-                          </p>
-                          {m.summary && (
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                              {m.summary.substring(0, 100)}...
+            <div className="border-t border-zinc-800/80 pt-5 grid grid-cols-1 md:grid-cols-2 gap-6 print:border-gray-300">
+              {/* Open Action Items */}
+              {briefing.openActionItems &&
+                briefing.openActionItems.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold uppercase tracking-wider text-amber-400 print:text-black">
+                      Pending Action Items
+                    </h3>
+                    <ul className="space-y-3">
+                      {briefing.openActionItems.map((item, idx) => (
+                        <li
+                          key={idx}
+                          className="flex items-start gap-2.5 p-3 rounded-xl bg-zinc-950/60 border border-zinc-800/80 print:bg-transparent print:border print:border-gray-300"
+                        >
+                          <CheckCircle2 className="w-4 h-4 mt-0.5 text-amber-400 shrink-0 print:hidden" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-zinc-200 print:text-black">
+                              {item.text || item.title}
                             </p>
-                          )}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-          </div>
+                            <p className="text-[11px] text-zinc-400 print:text-gray-600 mt-0.5">
+                              Owner: {item.owner || "Unassigned"}
+                            </p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+              {/* Related Past Context */}
+              {briefing.relatedPastMeetings &&
+                briefing.relatedPastMeetings.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold uppercase tracking-wider text-emerald-400 print:text-black">
+                      Related Past Context
+                    </h3>
+                    <ul className="space-y-3">
+                      {briefing.relatedPastMeetings.map((m, idx) => (
+                        <li
+                          key={idx}
+                          className="flex items-start gap-2.5 p-3 rounded-xl bg-zinc-950/60 border border-zinc-800/80 print:bg-transparent print:border print:border-gray-300"
+                        >
+                          <Calendar className="w-4 h-4 mt-0.5 text-emerald-400 shrink-0 print:hidden" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-zinc-200 print:text-black">
+                              {m.title || "Previous Meeting"}
+                            </p>
+                            {m.summary && (
+                              <p className="text-[11px] text-zinc-400 print:text-gray-600 mt-0.5 line-clamp-2">
+                                {m.summary}
+                              </p>
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
-};
-
-export default MeetingBriefing;
+}

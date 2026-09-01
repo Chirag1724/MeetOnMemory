@@ -19,7 +19,6 @@ export const calculateMeetingContributions = async (meetingId) => {
   const response = await apiClient.post(
     `/api/meetings/${meetingId}/contributions/calculate`,
     {},
-    
   );
   return response.data;
 };

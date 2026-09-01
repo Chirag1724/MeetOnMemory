@@ -26,6 +26,7 @@ import OrganizationBanner from "../components/organization/OrganizationBanner.js
 import PersonalNotesSidebar from "../components/PersonalNotesSidebar.jsx";
 import PendingRsvpBanner from "../components/dashboard/PendingRsvpBanner.jsx";
 import StoryThumbnails from "../components/dashboard/StoryThumbnails.jsx";
+import RecurringActionItems from "../components/dashboard/RecurringActionItems.jsx";
 
 /* ─── Role Badge ──────────────────────────────────────────────────────────── */
 const ROLE_STYLES = {
@@ -442,17 +443,20 @@ const Dashboard = () => {
           </div>
         </section>
 
-        {/* ── Additional Widgets (Gamification & Notes) ── */}
+        {/* ── Additional Widgets (Recurring Tasks, Gamification & Notes) ── */}
         <section
           aria-label="Additional Widgets"
-          className="mt-6 sm:mt-8 fade-in-up stagger-3 grid grid-cols-1 lg:grid-cols-2 gap-6"
+          className="mt-6 sm:mt-8 fade-in-up stagger-3 space-y-6"
         >
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <RecurringActionItems />
+            <PersonalNotesSidebar />
+          </div>
           <TopContributorsWidget
             organizationId={
               userData?.organization?._id || userData?.organization
             }
           />
-          <PersonalNotesSidebar />
         </section>
       </div>
     </div>

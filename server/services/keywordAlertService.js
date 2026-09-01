@@ -1,5 +1,4 @@
 import KeywordAlert from "../models/keywordAlertModel.js";
-import { createNotifications } from "./notificationService.js";
 import EmailService from "./EmailService.js";
 import { escapeRegex } from "../utils/regex.js";
 
@@ -70,11 +69,16 @@ export const scanTranscriptForKeywords = async (meeting, transcript) => {
     }
 
     // 3. Dispatch in-app notifications
+    const notificationDocs = [];
+    const keywordAlertBulkOps = [];
+
     if (usersToNotifyApp.length > 0) {
-      const promises = usersToNotifyApp.map(async (userId) => {
+      for (const userId of usersToNotifyApp) {
         const { matchedKeywords } = matchedKeywordsMap.get(userId);
         const keywordStr = matchedKeywords.join(", ");
-        await createNotifications([userId], {
+
+        notificationDocs.push({
+          user: userId,
           title: "Keyword Alert",
           description: `Your watched keyword(s) (${keywordStr}) were mentioned in "${meetingTitle}".`,
           category: "system",
@@ -82,30 +86,36 @@ export const scanTranscriptForKeywords = async (meeting, transcript) => {
           actionLabel: "View Meeting",
         });
 
-        // Record history log (bounded to last 50 entries)
-        await KeywordAlert.findOneAndUpdate(
-          { user: userId, organization: orgId },
-          {
-            $push: {
-              deliveryHistory: {
-                $each: [
-                  {
-                    channel: "app",
-                    matchedKeywords,
-                    meetingId,
-                    meetingTitle,
-                    status: "delivered",
-                    summary: `In-app notification sent for keywords: ${keywordStr}`,
-                    sentAt: new Date(),
-                  },
-                ],
-                $slice: -50,
+        keywordAlertBulkOps.push({
+          updateOne: {
+            filter: { user: userId, organization: orgId },
+            update: {
+              $push: {
+                deliveryHistory: {
+                  $each: [
+                    {
+                      channel: "app",
+                      matchedKeywords,
+                      meetingId,
+                      meetingTitle,
+                      status: "delivered",
+                      summary: `In-app notification sent for keywords: ${keywordStr}`,
+                      sentAt: new Date(),
+                    },
+                  ],
+                  $slice: -50,
+                },
               },
             },
           },
-        );
-      });
-      await Promise.all(promises);
+        });
+      }
+    }
+
+    if (notificationDocs.length > 0) {
+      const Notification = (await import("../models/notificationModel.js"))
+        .default;
+      await Notification.insertMany(notificationDocs);
     }
 
     // 4. Dispatch email notifications
@@ -130,31 +140,36 @@ export const scanTranscriptForKeywords = async (meeting, transcript) => {
           status = "failed";
         }
 
-        // Record history log (bounded to last 50 entries)
-        await KeywordAlert.findOneAndUpdate(
-          { user: userIdStr, organization: orgId },
-          {
-            $push: {
-              deliveryHistory: {
-                $each: [
-                  {
-                    channel: "email",
-                    matchedKeywords,
-                    meetingId,
-                    meetingTitle,
-                    recipientEmail: alert.user.email,
-                    status,
-                    summary: `Email alert (${status}) to ${alert.user.email} for keywords: ${keywordStr}`,
-                    sentAt: new Date(),
-                  },
-                ],
-                $slice: -50,
+        keywordAlertBulkOps.push({
+          updateOne: {
+            filter: { user: userIdStr, organization: orgId },
+            update: {
+              $push: {
+                deliveryHistory: {
+                  $each: [
+                    {
+                      channel: "email",
+                      matchedKeywords,
+                      meetingId,
+                      meetingTitle,
+                      recipientEmail: alert.user.email,
+                      status,
+                      summary: `Email alert (${status}) to ${alert.user.email} for keywords: ${keywordStr}`,
+                      sentAt: new Date(),
+                    },
+                  ],
+                  $slice: -50,
+                },
               },
             },
           },
-        );
+        });
       });
       await Promise.all(emailPromises);
+    }
+
+    if (keywordAlertBulkOps.length > 0) {
+      await KeywordAlert.bulkWrite(keywordAlertBulkOps);
     }
   } catch (error) {
     console.error("⚠️ Failed to scan transcript for keywords:", error);

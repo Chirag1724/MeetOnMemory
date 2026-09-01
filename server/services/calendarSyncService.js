@@ -3,6 +3,7 @@ import { google } from "googleapis";
 import axios from "axios";
 import cron from "node-cron";
 import CalendarConnection from "../models/calendarConnectionModel.js";
+import Meeting from "../models/meetingModel.js";
 import {
   decryptToken,
   encryptToken,
@@ -225,7 +226,9 @@ export const pushMeetingToIntegrations = async (userId, meeting) => {
       }
     });
     meeting.externalCalendarRefs = combinedRefs;
-    await meeting.save();
+    await Meeting.findByIdAndUpdate(meeting._id, {
+      $set: { externalCalendarRefs: combinedRefs },
+    });
   }
 };
 
@@ -360,6 +363,7 @@ const refreshOutlookToken = async (connection) => {
         process.env.MS_CLIENT_SECRET || process.env.MICROSOFT_CLIENT_SECRET,
       grant_type: "refresh_token",
       refresh_token: decryptToken(connection.refreshToken),
+      scope: "offline_access Calendars.ReadWrite",
     });
     const res = await axios.post(
       `https://login.microsoftonline.com/${process.env.MS_TENANT_ID || "common"}/oauth2/v2.0/token`,
@@ -386,22 +390,43 @@ const refreshOutlookToken = async (connection) => {
 // Cron job to run every 15 minutes to refresh expiring tokens
 export const initCalendarSyncCron = () => {
   cron.schedule("*/15 * * * *", async () => {
-    console.log("Running Calendar Sync Reconciliation Cron");
-    const expiringTime = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
-    const connections = await CalendarConnection.find({
-      syncStatus: "connected",
-      tokenExpiresAt: { $lte: expiringTime },
-    });
+    try {
+      console.log("Running Calendar Sync Reconciliation Cron");
+      const expiringTime = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+      const connectionsCursor = CalendarConnection.find({
+        syncStatus: "connected",
+        tokenExpiresAt: { $lte: expiringTime },
+      }).cursor();
 
-    for (const connection of connections) {
-      if (connection.provider === "google" && connection.refreshToken) {
-        await refreshGoogleToken(connection);
-      } else if (
-        ["outlook", "microsoft"].includes(connection.provider) &&
-        connection.refreshToken
-      ) {
-        await refreshOutlookToken(connection);
+      let batch = [];
+      const batchSize = 100;
+
+      const processBatch = async () => {
+        if (batch.length === 0) return;
+        const promises = batch.map(async (connection) => {
+          if (connection.provider === "google" && connection.refreshToken) {
+            return refreshGoogleToken(connection);
+          } else if (
+            ["outlook", "microsoft"].includes(connection.provider) &&
+            connection.refreshToken
+          ) {
+            return refreshOutlookToken(connection);
+          }
+        });
+        await Promise.allSettled(promises);
+        batch = [];
+      };
+
+      for await (const connection of connectionsCursor) {
+        batch.push(connection);
+        if (batch.length >= batchSize) {
+          await processBatch();
+        }
       }
+
+      await processBatch(); // process remaining connections
+    } catch (error) {
+      console.error("Cron job error:", error);
     }
   });
 };

@@ -27,8 +27,7 @@ import path from "path";
 import os from "os";
 import OpenAI from "openai";
 
-import { sentimentAnalysisQueue } from "../services/queueService.js";
-
+import { sentimentAnalysisQueue, transcriptionQueue } from "../services/queueService.js";
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-tests",
 });
@@ -258,12 +257,17 @@ export const stopRecording = async (req, res) => {
     transcript.recordingTimestamps.processingStartedAt = new Date();
     await transcript.save();
 
-    // Trigger transcription in background (non-blocking)
-    processTranscription(transcript._id).catch((err) => {
-      console.error("Background transcription failed:", err);
-    });
+    // Enqueue transcription job with durable status tracking
+    try {
+      const job = await transcriptionQueue.add("transcribe-audio", {
+        transcriptId: transcript._id,
+      });
+      console.log(`✅ Transcription job enqueued (Job ID: ${job?.id})`);
+    } catch (err) {
+      console.error("Failed to enqueue transcription:", err);
+    }
 
-    res.status(200).json({
+        res.status(200).json({
       success: true,
       message: "Recording stopped, transcription started",
       transcriptId: transcript._id,
@@ -818,19 +822,19 @@ export const retryTranscription = async (req, res) => {
 
     // Reset status and retry
     transcript.status = "processing";
-    if (!transcript.recordingTimestamps) {
-      transcript.recordingTimestamps = {};
-    }
-    transcript.recordingTimestamps.processingStartedAt = new Date();
-    transcript.errorMessage = null;
     await transcript.save();
 
-    // Trigger transcription in background
-    processTranscription(transcript._id).catch((err) => {
-      console.error("Background transcription retry failed:", err);
-    });
+    // Enqueue transcription job with durable status tracking
+    try {
+      const job = await transcriptionQueue.add("transcribe-audio", {
+        transcriptId: transcript._id,
+      });
+      console.log(`✅ Transcription job enqueued (Job ID: ${job?.id})`);
+    } catch (err) {
+      console.error("Failed to enqueue transcription:", err);
+    }
 
-    res.status(200).json({
+       res.status(200).json({
       success: true,
       message: "Transcription retry started",
       transcriptId: transcript._id,
@@ -978,6 +982,15 @@ async function processTranscription(transcriptId) {
   }
 }
 /**
+ * @deprecated Transcription is now handled via BullMQ job queue (processTranscriptionJob).
+ * This function is kept for backward compatibility but should not be called directly.
+ */
+async function processTranscription(transcriptId) {
+  console.warn(
+    "⚠️ processTranscription called directly (deprecated). Use transcriptionQueue instead.",
+  );
+  // Jobs are now enqueued; this fallback is no longer used.
+}/**
  * Get transcript by meeting ID
  */
 export const getTranscriptByMeeting = async (req, res) => {
